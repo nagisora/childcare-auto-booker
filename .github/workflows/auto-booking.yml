@@ -1,0 +1,72 @@
+name: Airリザーブ自動予約
+
+on:
+  schedule:
+    # 毎日9:30に実行（実際の公開日時は月1回なので、その日のみ動作）
+    - cron: '30 9 * * *'
+  workflow_dispatch:  # 手動実行も可能
+
+jobs:
+  auto-booking:
+    runs-on: ubuntu-24.04
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Install Playwright browsers
+      run: |
+        playwright install chromium
+        playwright install-deps chromium
+        
+    - name: Create logs directory
+      run: mkdir -p logs screenshots
+      
+    - name: Run auto-booking
+      env:
+        BOOKER_NAME: ${{ secrets.BOOKER_NAME }}
+        BOOKER_EMAIL: ${{ secrets.BOOKER_EMAIL }}
+        BOOKER_PHONE: ${{ secrets.BOOKER_PHONE }}
+        CHILD_NAME: ${{ secrets.CHILD_NAME }}
+        CHILD_AGE: ${{ secrets.CHILD_AGE }}
+        TARGET_URL: ${{ secrets.TARGET_URL }}
+        NEXT_RELEASE_DATETIME: ${{ secrets.NEXT_RELEASE_DATETIME }}
+        MONITOR_DURATION_MINUTES: ${{ secrets.MONITOR_DURATION_MINUTES }}
+        PREFERRED_DAYS: ${{ secrets.PREFERRED_DAYS }}
+        PREFERRED_TIME_START: ${{ secrets.PREFERRED_TIME_START }}
+        PREFERRED_TIME_END: ${{ secrets.PREFERRED_TIME_END }}
+        DRY_RUN: ${{ secrets.DRY_RUN }}
+        HEADLESS: true
+        DEBUG: false
+        NOTIFY_SUCCESS: true
+        NOTIFY_FAILURE: true
+      run: |
+        python main.py --mode schedule
+        
+    - name: Upload logs
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: booking-logs-${{ github.run_number }}
+        path: |
+          logs/
+          screenshots/
+        retention-days: 30
+        
+    - name: Upload screenshots
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: booking-screenshots-${{ github.run_number }}
+        path: screenshots/
+        retention-days: 7
