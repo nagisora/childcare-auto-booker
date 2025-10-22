@@ -8,6 +8,7 @@ import asyncio
 import logging
 import os
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import List, Dict, Optional
 from playwright.async_api import async_playwright, Browser, Page
 
