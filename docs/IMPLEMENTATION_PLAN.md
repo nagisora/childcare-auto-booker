@@ -140,26 +140,30 @@ DEBUG=false    # デバッグモード
 - [x] GitHub Actionsワークフロー設定
 - [x] README.mdとUSAGE.mdの作成
 - [x] 詳細ドキュメント（docs/）の作成
+- [x] 仮想環境セットアップ対応（2024-12-19）
+- [x] 自動セットアップスクリプトの作成
+- [x] バグ修正（Pathインポート追加）
+- [x] miseとvenvの併用手順の整備
 
 ### 🔄 次のステップ（明日以降）
 
-1. **miseでPython環境のセットアップ**
+1. **自動セットアップスクリプトの実行**
    ```bash
-   mise install python@3.12
-   mise use python@3.12
+   ./scripts/setup.sh
    ```
 
-2. **依存関係のインストール**
+2. **設定ファイルの編集**
    ```bash
-   pip install -r requirements.txt
-   playwright install chromium
-   playwright install-deps chromium
+   # .envファイルを編集して実際の値を設定
+   nano .env
    ```
 
-3. **設定ファイルの作成とテスト**
+3. **テスト実行**
    ```bash
-   cp config/.env.example .env
-   # .envファイルを編集
+   # 仮想環境を有効化
+   source .venv/bin/activate
+   
+   # DRY_RUNモードでテスト
    DRY_RUN=true python main.py --mode monitor
    ```
 
@@ -214,5 +218,5 @@ DEBUG=false    # デバッグモード
 ---
 
 **作成日**: 2024年12月19日  
-**最終更新**: 2024年12月19日  
+**最終更新**: 2024年12月19日（仮想環境セットアップ対応）  
 **ステータス**: 基本実装完了、テスト・運用準備段階

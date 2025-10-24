@@ -33,14 +33,29 @@ mise use python@3.12
 python --version
 ```
 
-### 3. プロジェクトのセットアップ
+### 3. 仮想環境のセットアップ（推奨）
+
+プロジェクトごとに独立した環境を作成することを推奨します：
+
+```bash
+# 仮想環境を作成
+python -m venv .venv
+
+# 仮想環境を有効化
+source .venv/bin/activate
+
+# 仮想環境が有効化されているか確認
+which python  # .venv/bin/python が表示されるはず
+```
+
+### 4. プロジェクトのセットアップ
 
 ```bash
 # リポジトリをクローン
 git clone https://github.com/junyatamaki/childcare-auto-booker.git
 cd childcare-auto-booker
 
-# 依存関係をインストール
+# 依存関係をインストール（仮想環境内で実行）
 pip install -r requirements.txt
 
 # Playwrightブラウザをインストール
@@ -48,7 +63,23 @@ playwright install chromium
 playwright install-deps chromium
 ```
 
-### 4. 設定ファイルの作成
+### 5. 自動セットアップスクリプト（推奨）
+
+初回セットアップを簡単にするスクリプトを用意しています：
+
+```bash
+# セットアップスクリプトを実行
+./scripts/setup.sh
+```
+
+このスクリプトは以下を自動実行します：
+- Python 3.12のセットアップ
+- 仮想環境の作成
+- 依存関係のインストール
+- Playwrightブラウザのインストール
+- 設定ファイルの作成
+
+### 6. 設定ファイルの作成
 
 ```bash
 # 設定ファイルのテンプレートをコピー
@@ -117,6 +148,9 @@ NOTIFY_FAILURE=true
 まず、DRY_RUNモードでテスト実行することを推奨します：
 
 ```bash
+# 仮想環境を有効化（まだ有効化していない場合）
+source .venv/bin/activate
+
 # DRY_RUNモードで実行
 DRY_RUN=true python main.py --mode monitor
 ```

@@ -69,17 +69,31 @@
    cd childcare-auto-booker
    ```
 
-3. **依存関係のインストール**
+3. **仮想環境のセットアップ（推奨）**
+   ```bash
+   # 仮想環境を作成
+   python -m venv .venv
+   
+   # 仮想環境を有効化
+   source .venv/bin/activate
+   ```
+
+4. **依存関係のインストール**
    ```bash
    pip install -r requirements.txt
    playwright install chromium
    ```
 
-4. **設定ファイルの作成**
+5. **設定ファイルの作成**
    ```bash
    cp config/.env.example .env
    # .envファイルを編集して予約者情報を設定
    ```
+
+**または、自動セットアップスクリプトを使用：**
+```bash
+./scripts/setup.sh
+```
 
 ## 使用方法
 
