@@ -8,6 +8,7 @@ import asyncio
 import logging
 import os
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, Optional
 from playwright.async_api import Page
 
@@ -18,6 +19,8 @@ class AirReserveBooker:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.dry_run = os.getenv("DRY_RUN", "false").lower() == "true"
+        self.stop_before_submit = os.getenv("STOP_BEFORE_SUBMIT", "true").lower() == "true"
+        self.require_manual_confirmation = os.getenv("REQUIRE_MANUAL_CONFIRMATION", "false").lower() == "true"
         
         # 予約者情報
         self.booker_name = os.getenv("BOOKER_NAME", "")
@@ -31,7 +34,7 @@ class AirReserveBooker:
         self.preferred_time_start = os.getenv("PREFERRED_TIME_START", "09:00")
         self.preferred_time_end = os.getenv("PREFERRED_TIME_END", "17:00")
         
-        self.logger.info(f"予約実行クラス初期化完了 (DRY_RUN: {self.dry_run})")
+        self.logger.info(f"予約実行クラス初期化完了 (DRY_RUN: {self.dry_run}, STOP_BEFORE_SUBMIT: {self.stop_before_submit})")
         
     async def execute_booking(self, slot_info: Dict, page: Page) -> bool:
         """予約を実行"""
@@ -263,52 +266,101 @@ class AirReserveBooker:
                 '.submit-button'
             ]
             
+            confirm_button = None
+            used_selector = None
+            
             for selector in confirm_selectors:
                 element = await page.query_selector(selector)
                 if element and await element.is_visible() and await element.is_enabled():
-                    await element.click()
-                    self.logger.info(f"確認ボタンをクリック: {selector}")
-                    
-                    # ページの変化を待機
-                    await asyncio.sleep(3)
-                    
-                    # 成功メッセージの確認
-                    success_indicators = [
-                        '予約完了',
-                        '予約受付',
-                        '予約確定',
-                        'success',
-                        '完了'
-                    ]
-                    
-                    page_content = await page.content()
-                    for indicator in success_indicators:
-                        if indicator in page_content:
-                            self.logger.info(f"予約成功を確認: {indicator}")
-                            return True
-                            
-                    # エラーメッセージの確認
-                    error_indicators = [
-                        'エラー',
-                        'error',
-                        '失敗',
-                        '満員',
-                        '受付終了'
-                    ]
-                    
-                    for indicator in error_indicators:
-                        if indicator in page_content:
-                            self.logger.error(f"予約エラーを検出: {indicator}")
-                            return False
-                            
+                    confirm_button = element
+                    used_selector = selector
+                    break
+            
+            if not confirm_button:
+                self.logger.error("確認ボタンが見つかりません")
+                return False
+            
+            # スクリーンショットを保存（送信前）
+            screenshot_path = await self.take_screenshot(page, "before_submit")
+            self.logger.info(f"送信前のスクリーンショットを保存: {screenshot_path}")
+            
+            # STOP_BEFORE_SUBMITチェック
+            if self.stop_before_submit:
+                self.logger.warning("⚠️ STOP_BEFORE_SUBMIT: 最終送信ボタンを押さずに停止しました")
+                self.logger.info(f"確認ボタン: {used_selector}")
+                self.logger.info("確認画面のスクリーンショットを確認してください")
+                self.logger.info("本番実行する場合は STOP_BEFORE_SUBMIT=false に設定してください")
+                return True  # テスト成功として扱う
+            
+            # 手動確認が必要な場合
+            if self.require_manual_confirmation:
+                self.logger.warning("⚠️ 手動確認が必要です")
+                self.logger.info("確認画面のスクリーンショットを確認してください")
+                response = input("予約を実行しますか？ (yes/no): ")
+                if response.lower() != "yes":
+                    self.logger.info("予約をキャンセルしました")
+                    return False
+            
+            # 確認ボタンをクリック
+            await confirm_button.click()
+            self.logger.info(f"確認ボタンをクリック: {used_selector}")
+            
+            # ページの変化を待機
+            await asyncio.sleep(3)
+            
+            # スクリーンショットを保存（送信後）
+            screenshot_path = await self.take_screenshot(page, "after_submit")
+            self.logger.info(f"送信後のスクリーンショットを保存: {screenshot_path}")
+            
+            # 成功メッセージの確認
+            success_indicators = [
+                '予約完了',
+                '予約受付',
+                '予約確定',
+                'success',
+                '完了'
+            ]
+            
+            page_content = await page.content()
+            for indicator in success_indicators:
+                if indicator in page_content:
+                    self.logger.info(f"予約成功を確認: {indicator}")
                     return True
                     
-            self.logger.error("確認ボタンが見つかりません")
-            return False
+            # エラーメッセージの確認
+            error_indicators = [
+                'エラー',
+                'error',
+                '失敗',
+                '満員',
+                '受付終了'
+            ]
+            
+            for indicator in error_indicators:
+                if indicator in page_content:
+                    self.logger.error(f"予約エラーを検出: {indicator}")
+                    return False
+                    
+            return True
             
         except Exception as e:
             self.logger.error(f"予約確認エラー: {e}")
             return False
+    
+    async def take_screenshot(self, page: Page, prefix: str = "booking") -> str:
+        """スクリーンショットを保存"""
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"screenshots/{prefix}_{timestamp}.png"
+            
+            # スクリーンショットディレクトリを作成
+            Path(filename).parent.mkdir(parents=True, exist_ok=True)
+            
+            await page.screenshot(path=filename, full_page=True)
+            return filename
+        except Exception as e:
+            self.logger.error(f"スクリーンショット保存エラー: {e}")
+            return ""
             
     def is_preferred_slot(self, slot_info: Dict) -> bool:
         """希望条件に合致する枠かどうかを判定"""

@@ -131,6 +131,10 @@ python main.py --mode schedule
 - `HEADLESS`: ヘッドレスモード（ブラウザを表示しない）
 - `DEBUG`: デバッグモード
 
+### テスト・安全設定
+- `STOP_BEFORE_SUBMIT`: 最終送信ボタンを押さずに停止（テスト用、デフォルト: `true`）
+- `REQUIRE_MANUAL_CONFIRMATION`: 送信前に手動確認を求める
+
 ## 注意事項
 
 ### ⚠️ 利用規約の遵守

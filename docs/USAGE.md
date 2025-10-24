@@ -140,15 +140,46 @@ NOTIFY_FAILURE=true
 - `HEADLESS`: `true`に設定するとブラウザが表示されません
 - `DEBUG`: `true`に設定すると詳細なログが出力されます
 
+#### テスト・安全設定
+- `STOP_BEFORE_SUBMIT`: `true`に設定すると最終送信ボタンを押さずに停止します（推奨: テスト時は`true`）
+- `REQUIRE_MANUAL_CONFIRMATION`: `true`に設定すると送信前に手動確認を求めます
+
 ## ローカル実行
 
 ### 1. テスト実行
 
-まず、DRY_RUNモードでテスト実行することを推奨します：
+安全なテスト実行のため、段階的にテストすることを推奨します：
 
+#### ステップ1: DRY_RUNモード（予約実行なし）
 ```bash
 # DRY_RUNモードでテスト実行
 mise run test-dry-run
+```
+
+#### ステップ2: STOP_BEFORE_SUBMITモード（送信直前まで実行）
+```bash
+# .envファイルで設定
+DRY_RUN=false
+STOP_BEFORE_SUBMIT=true
+
+# テスト実行
+mise run test-monitor
+```
+
+このモードでは：
+- フォーム入力まで実行される
+- 確認画面のスクリーンショットが保存される
+- 最終送信ボタンは押されない
+- 実際の予約は発生しない
+
+#### ステップ3: 本番実行
+```bash
+# .envファイルで設定
+DRY_RUN=false
+STOP_BEFORE_SUBMIT=false
+
+# 本番実行
+python main.py --mode schedule
 ```
 
 ### 2. 監視モード
