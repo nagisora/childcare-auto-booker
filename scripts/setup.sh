@@ -27,6 +27,12 @@ mise run prerequisites
 echo "🌐 Playwrightブラウザをインストール中..."
 mise run setup-playwright
 
+# システム依存関係のインストール案内
+echo "⚠️  システム依存関係のインストールが必要です"
+echo "   以下のコマンドを実行してください:"
+echo "   mise run setup-playwright-deps"
+echo "   (sudoパスワードが必要です)"
+
 # 設定ファイルを作成
 echo "⚙️  設定ファイルを作成中..."
 if [ ! -f ".env" ]; then
@@ -51,5 +57,6 @@ echo ""
 echo "利用可能なmiseタスク:"
 echo "  mise run prerequisites  # 依存関係インストール"
 echo "  mise run setup-playwright  # Playwrightブラウザインストール"
+echo "  mise run setup-playwright-deps  # システム依存関係インストール(sudo必要)"
 echo "  mise run test-dry-run  # DRY_RUNモードでテスト"
 echo "  mise run test-monitor  # 監視モード実行"

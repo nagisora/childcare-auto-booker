@@ -12,7 +12,12 @@ run = "pip install -r requirements.txt"
 
 [tasks.setup-playwright]
 description = "Install Playwright browsers"
-run = "playwright install chromium && playwright install-deps chromium"
+env = { PLAYWRIGHT_BROWSERS_PATH = "0" }
+run = "playwright install chromium"
+
+[tasks.setup-playwright-deps]
+description = "Install system dependencies for Playwright (requires sudo)"
+run = "playwright install-deps chromium"
 
 [tasks.test-dry-run]
 description = "Test run in DRY_RUN mode"
