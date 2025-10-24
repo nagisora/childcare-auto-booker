@@ -69,22 +69,19 @@
    cd childcare-auto-booker
    ```
 
-3. **仮想環境のセットアップ（推奨）**
+3. **mise自動venv機能の活用（推奨）**
    ```bash
-   # 仮想環境を作成
-   python -m venv .venv
+   # miseでPython環境をセットアップ（自動でvenvも作成される）
+   mise install
    
-   # 仮想環境を有効化
-   source .venv/bin/activate
+   # 依存関係をインストール
+   mise run prerequisites
+   
+   # Playwrightブラウザをインストール
+   mise run setup-playwright
    ```
 
-4. **依存関係のインストール**
-   ```bash
-   pip install -r requirements.txt
-   playwright install chromium
-   ```
-
-5. **設定ファイルの作成**
+4. **設定ファイルの作成**
    ```bash
    cp config/.env.example .env
    # .envファイルを編集して予約者情報を設定

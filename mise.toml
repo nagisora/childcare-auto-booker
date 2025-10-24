@@ -1,0 +1,23 @@
+[tools]
+python = "3.12"
+
+[env]
+_.python.venv = { path = ".venv", create = true, python_create_args = ["--upgrade-deps"] }
+PROJECT_NAME = "{{ config_root | basename }}"
+
+[tasks.prerequisites]
+description = "Install dependencies"
+alias = "i"
+run = "pip install -r requirements.txt"
+
+[tasks.setup-playwright]
+description = "Install Playwright browsers"
+run = "playwright install chromium && playwright install-deps chromium"
+
+[tasks.test-dry-run]
+description = "Test run in DRY_RUN mode"
+run = "DRY_RUN=true python main.py --mode monitor"
+
+[tasks.test-monitor]
+description = "Run monitor mode"
+run = "python main.py --mode monitor"

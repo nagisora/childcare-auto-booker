@@ -33,18 +33,15 @@ mise use python@3.12
 python --version
 ```
 
-### 3. 仮想環境のセットアップ（推奨）
+### 3. mise自動venv機能の活用（推奨）
 
-プロジェクトごとに独立した環境を作成することを推奨します：
+miseには自動venv作成機能があります。プロジェクトディレクトリに移動すると自動でvenvが作成・有効化されます：
 
 ```bash
-# 仮想環境を作成
-python -m venv .venv
+# プロジェクトディレクトリに移動（自動でvenvが作成・有効化される）
+cd childcare-auto-booker
 
-# 仮想環境を有効化
-source .venv/bin/activate
-
-# 仮想環境が有効化されているか確認
+# Pythonのパスを確認（.venv内のPythonが使用される）
 which python  # .venv/bin/python が表示されるはず
 ```
 
@@ -55,12 +52,14 @@ which python  # .venv/bin/python が表示されるはず
 git clone https://github.com/junyatamaki/childcare-auto-booker.git
 cd childcare-auto-booker
 
-# 依存関係をインストール（仮想環境内で実行）
-pip install -r requirements.txt
+# miseでPython環境をセットアップ（自動でvenvも作成される）
+mise install
+
+# 依存関係をインストール
+mise run prerequisites
 
 # Playwrightブラウザをインストール
-playwright install chromium
-playwright install-deps chromium
+mise run setup-playwright
 ```
 
 ### 5. 自動セットアップスクリプト（推奨）
@@ -73,8 +72,8 @@ playwright install-deps chromium
 ```
 
 このスクリプトは以下を自動実行します：
-- Python 3.12のセットアップ
-- 仮想環境の作成
+- miseでPython環境のセットアップ
+- 自動venv作成・有効化
 - 依存関係のインストール
 - Playwrightブラウザのインストール
 - 設定ファイルの作成
@@ -148,11 +147,8 @@ NOTIFY_FAILURE=true
 まず、DRY_RUNモードでテスト実行することを推奨します：
 
 ```bash
-# 仮想環境を有効化（まだ有効化していない場合）
-source .venv/bin/activate
-
-# DRY_RUNモードで実行
-DRY_RUN=true python main.py --mode monitor
+# DRY_RUNモードでテスト実行
+mise run test-dry-run
 ```
 
 ### 2. 監視モード
@@ -160,7 +156,7 @@ DRY_RUN=true python main.py --mode monitor
 予約枠の検出のみを行う場合：
 
 ```bash
-python main.py --mode monitor
+mise run test-monitor
 ```
 
 ### 3. 予約実行モード
