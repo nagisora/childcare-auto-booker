@@ -94,12 +94,66 @@ class AirReserveBooker:
                 self.logger.error(f"予約ページ読み込み失敗: {response.status if response else 'No response'}")
                 return False
                 
+            # エラーメッセージのチェック（予約受付期間外かどうか）
+            is_available = await self._check_reservation_availability(page)
+            if not is_available:
+                self.logger.warning("この予約枠は予約受付期間外です")
+                return False
+                
             return True
             
         except Exception as e:
             self.logger.error(f"予約リンククリックエラー: {e}")
             return False
             
+    async def _check_reservation_availability(self, page: Page) -> bool:
+        """予約ページでエラーメッセージをチェックし、予約可能かを判定"""
+        try:
+            # ページのコンテンツを取得
+            page_content = await page.content()
+            page_text = await page.inner_text('body')
+            
+            # エラーメッセージのパターン
+            error_patterns = [
+                '予約受付期間外です',
+                '別の時間帯をお探しください',
+                '受付期間外',
+                '予約できません',
+                'このサービスはご利用いただけません',
+                'ご予約いただけません'
+            ]
+            
+            # エラーメッセージのチェック
+            for pattern in error_patterns:
+                if pattern in page_text:
+                    self.logger.debug(f"エラーメッセージを検出: {pattern}")
+                    return False
+            
+            # 成功メッセージまたはフォーム要素のチェック
+            # 予約フォームが表示されている場合は予約可能
+            form_indicators = [
+                'name="name"',  # 名前入力欄
+                'name="email"',  # メール入力欄
+                'type="submit"',  # 送信ボタン
+                '予約',  # 予約関連のテキスト
+                'メニュー',  # メニュー選択
+            ]
+            
+            # HTMLコンテンツでチェック
+            for indicator in form_indicators:
+                if indicator in page_content:
+                    self.logger.debug(f"予約可能な状態を確認: {indicator}")
+                    return True
+            
+            # デフォルトは予約可能として扱う
+            self.logger.debug("エラーメッセージが見つかりませんでした。予約可能とみなします。")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"予約可否チェックエラー: {e}")
+            # エラー時は予約可能として扱う（安全側に倒す）
+            return True
+    
     async def _select_menu(self, page: Page) -> bool:
         """メニューを選択"""
         try:

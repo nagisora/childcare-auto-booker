@@ -17,7 +17,7 @@ from playwright.async_api import async_playwright, Browser, Page
 class AirReserveScraper:
     """Airリザーブ予約ページのスクレイピングクラス"""
     
-    def __init__(self):
+    def __init__(self, booker=None):
         self.logger = logging.getLogger(__name__)
         self.target_url = os.getenv("TARGET_URL", "https://airrsv.net/kokoroto-azukari/calendar")
         self.headless = os.getenv("HEADLESS", "true").lower() == "true"
@@ -32,6 +32,9 @@ class AirReserveScraper:
         
         # 監視時間（分）
         self.monitor_duration = int(os.getenv("MONITOR_DURATION_MINUTES", "10"))
+        
+        # bookerへの参照（エラーチェック用）
+        self.booker = booker
         
         self.browser: Optional[Browser] = None
         self.page: Optional[Page] = None
