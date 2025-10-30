@@ -69,10 +69,16 @@
    cd childcare-auto-booker
    ```
 
-3. **依存関係のインストール**
+3. **mise自動venv機能の活用（推奨）**
    ```bash
-   pip install -r requirements.txt
-   playwright install chromium
+   # miseでPython環境をセットアップ（自動でvenvも作成される）
+   mise install
+   
+   # 依存関係をインストール
+   mise run prerequisites
+   
+   # Playwrightブラウザをインストール
+   mise run setup-playwright
    ```
 
 4. **設定ファイルの作成**
@@ -80,6 +86,11 @@
    cp config/.env.example .env
    # .envファイルを編集して予約者情報を設定
    ```
+
+**または、自動セットアップスクリプトを使用：**
+```bash
+./scripts/setup.sh
+```
 
 ## 使用方法
 
@@ -119,6 +130,10 @@ python main.py --mode schedule
 - `DRY_RUN`: テストモード（実際の予約は実行しない）
 - `HEADLESS`: ヘッドレスモード（ブラウザを表示しない）
 - `DEBUG`: デバッグモード
+
+### テスト・安全設定
+- `STOP_BEFORE_SUBMIT`: 最終送信ボタンを押さずに停止（テスト用、デフォルト: `true`）
+- `REQUIRE_MANUAL_CONFIRMATION`: 送信前に手動確認を求める
 
 ## 注意事項
 

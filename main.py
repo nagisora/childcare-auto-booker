@@ -9,6 +9,7 @@ Airリザーブ自動予約システム - メインエントリーポイント
 """
 
 import argparse
+import asyncio
 import logging
 import sys
 from datetime import datetime
@@ -26,21 +27,39 @@ from src.notifier import NotificationManager
 
 def setup_logging():
     """ログ設定を初期化"""
+    import os
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
     
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(log_dir / f"auto-booker-{datetime.now().strftime('%Y%m%d')}.log"),
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
+    # DEBUG環境変数に応じてログレベルを設定
+    debug_mode = os.getenv("DEBUG", "false").lower() == "true"
+    log_level = logging.DEBUG if debug_mode else logging.INFO
+    
+    # ロガーの設定
+    root_logger = logging.getLogger()
+    root_logger.setLevel(log_level)
+    
+    # ハンドラーをクリア
+    root_logger.handlers.clear()
+    
+    # フォーマッター
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    
+    # ファイルハンドラー
+    file_handler = logging.FileHandler(log_dir / f"auto-booker-{datetime.now().strftime('%Y%m%d')}.log")
+    file_handler.setLevel(log_level)
+    file_handler.setFormatter(formatter)
+    root_logger.addHandler(file_handler)
+    
+    # コンソールハンドラー
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(log_level)
+    console_handler.setFormatter(formatter)
+    root_logger.addHandler(console_handler)
 
 
-def main():
-    """メイン関数"""
+async def main_async():
+    """非同期メイン関数"""
     parser = argparse.ArgumentParser(description="Airリザーブ自動予約システム")
     parser.add_argument(
         "--mode", 
@@ -69,12 +88,12 @@ def main():
         if args.mode == "monitor":
             # 監視モード
             scraper = AirReserveScraper()
-            scraper.start_monitoring()
+            await scraper.start_monitoring()
             
         elif args.mode == "book":
             # 予約実行モード
-            booker = AirReserveBooker()
-            booker.execute_booking()
+            logger.warning("bookモードは現在、実装されていません")
+            logger.warning("monitorモードで予約可能枠を検出してください")
             
         elif args.mode == "schedule":
             # 定期実行モード
@@ -87,6 +106,11 @@ def main():
     except Exception as e:
         logger.error(f"エラーが発生しました: {e}")
         sys.exit(1)
+
+
+def main():
+    """メイン関数（非同期関数を実行）"""
+    asyncio.run(main_async())
 
 
 if __name__ == "__main__":

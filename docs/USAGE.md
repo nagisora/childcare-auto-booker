@@ -33,22 +33,52 @@ mise use python@3.12
 python --version
 ```
 
-### 3. プロジェクトのセットアップ
+### 3. mise自動venv機能の活用（推奨）
+
+miseには自動venv作成機能があります。プロジェクトディレクトリに移動すると自動でvenvが作成・有効化されます：
+
+```bash
+# プロジェクトディレクトリに移動（自動でvenvが作成・有効化される）
+cd childcare-auto-booker
+
+# Pythonのパスを確認（.venv内のPythonが使用される）
+which python  # .venv/bin/python が表示されるはず
+```
+
+### 4. プロジェクトのセットアップ
 
 ```bash
 # リポジトリをクローン
 git clone https://github.com/junyatamaki/childcare-auto-booker.git
 cd childcare-auto-booker
 
+# miseでPython環境をセットアップ（自動でvenvも作成される）
+mise install
+
 # 依存関係をインストール
-pip install -r requirements.txt
+mise run prerequisites
 
 # Playwrightブラウザをインストール
-playwright install chromium
-playwright install-deps chromium
+mise run setup-playwright
 ```
 
-### 4. 設定ファイルの作成
+### 5. 自動セットアップスクリプト（推奨）
+
+初回セットアップを簡単にするスクリプトを用意しています：
+
+```bash
+# セットアップスクリプトを実行
+./scripts/setup.sh
+```
+
+このスクリプトは以下を自動実行します：
+- miseでPython環境のセットアップ
+- 自動venv作成・有効化
+- 依存関係のインストール
+- Playwrightブラウザのインストール
+- 設定ファイルの作成
+
+### 6. 設定ファイルの作成
 
 ```bash
 # 設定ファイルのテンプレートをコピー
@@ -110,15 +140,46 @@ NOTIFY_FAILURE=true
 - `HEADLESS`: `true`に設定するとブラウザが表示されません
 - `DEBUG`: `true`に設定すると詳細なログが出力されます
 
+#### テスト・安全設定
+- `STOP_BEFORE_SUBMIT`: `true`に設定すると最終送信ボタンを押さずに停止します（推奨: テスト時は`true`）
+- `REQUIRE_MANUAL_CONFIRMATION`: `true`に設定すると送信前に手動確認を求めます
+
 ## ローカル実行
 
 ### 1. テスト実行
 
-まず、DRY_RUNモードでテスト実行することを推奨します：
+安全なテスト実行のため、段階的にテストすることを推奨します：
 
+#### ステップ1: DRY_RUNモード（予約実行なし）
 ```bash
-# DRY_RUNモードで実行
-DRY_RUN=true python main.py --mode monitor
+# DRY_RUNモードでテスト実行
+mise run test-dry-run
+```
+
+#### ステップ2: STOP_BEFORE_SUBMITモード（送信直前まで実行）
+```bash
+# .envファイルで設定
+DRY_RUN=false
+STOP_BEFORE_SUBMIT=true
+
+# テスト実行
+mise run test-monitor
+```
+
+このモードでは：
+- フォーム入力まで実行される
+- 確認画面のスクリーンショットが保存される
+- 最終送信ボタンは押されない
+- 実際の予約は発生しない
+
+#### ステップ3: 本番実行
+```bash
+# .envファイルで設定
+DRY_RUN=false
+STOP_BEFORE_SUBMIT=false
+
+# 本番実行
+python main.py --mode schedule
 ```
 
 ### 2. 監視モード
@@ -126,7 +187,7 @@ DRY_RUN=true python main.py --mode monitor
 予約枠の検出のみを行う場合：
 
 ```bash
-python main.py --mode monitor
+mise run test-monitor
 ```
 
 ### 3. 予約実行モード
