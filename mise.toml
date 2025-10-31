@@ -26,3 +26,7 @@ run = "DRY_RUN=true python main.py --mode monitor"
 [tasks.test-monitor]
 description = "Run monitor mode"
 run = "python main.py --mode monitor"
+
+[tasks.inspect-form]
+description = "Inspect Air Reserve form structure"
+run = "python scripts/inspect_form_structure.py"

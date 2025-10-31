@@ -87,13 +87,53 @@ async def main_async():
     try:
         if args.mode == "monitor":
             # 監視モード
-            scraper = AirReserveScraper()
+            booker = AirReserveBooker()
+            scraper = AirReserveScraper(booker=booker)  # bookerを設定
             await scraper.start_monitoring()
             
         elif args.mode == "book":
             # 予約実行モード
-            logger.warning("bookモードは現在、実装されていません")
-            logger.warning("monitorモードで予約可能枠を検出してください")
+            logger.info("予約実行モード: 既存の予約可能枠を検出して予約を実行します")
+            
+            scraper = AirReserveScraper()
+            booker = AirReserveBooker()
+            scraper.booker = booker  # bookerを設定
+            
+            async with scraper:
+                # カレンダーページを読み込み
+                if not await scraper.load_calendar_page():
+                    logger.error("カレンダーページの読み込みに失敗しました")
+                    return
+                
+                # 予約可能枠を取得
+                logger.info("予約可能枠を検索中...")
+                available_slots = await scraper.get_available_slots(max_weeks=7)
+                
+                if not available_slots:
+                    logger.warning("予約可能枠が見つかりませんでした")
+                    return
+                
+                logger.info(f"{len(available_slots)}件の予約可能枠を発見")
+                
+                # 希望条件に合致する枠を探して予約を実行
+                booking_success = False
+                for slot in available_slots:
+                    if booker.is_preferred_slot(slot):
+                        logger.info(f"希望条件に合致する枠を発見: {slot['text']}")
+                        logger.info("予約を実行します...")
+                        
+                        # 予約を実行
+                        success = await booker.execute_booking(slot, scraper.page)
+                        
+                        if success:
+                            logger.info(f"予約が成功しました: {slot['text']}")
+                            booking_success = True
+                            break  # 最初の成功で終了
+                        else:
+                            logger.warning(f"予約が失敗しました: {slot['text']}")
+                
+                if not booking_success:
+                    logger.warning("希望条件に合致する枠の予約に失敗しました")
             
         elif args.mode == "schedule":
             # 定期実行モード

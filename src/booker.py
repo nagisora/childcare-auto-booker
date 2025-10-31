@@ -35,6 +35,63 @@ class AirReserveBooker:
         self.preferred_time_end = os.getenv("PREFERRED_TIME_END", "17:00")
         
         self.logger.info(f"予約実行クラス初期化完了 (DRY_RUN: {self.dry_run}, STOP_BEFORE_SUBMIT: {self.stop_before_submit})")
+    
+    async def _retry_with_backoff(self, func, max_retries: int = 3, base_delay: float = 1.0, operation_name: str = "操作"):
+        """指数バックオフによるリトライ機能
+        
+        Args:
+            func: 実行する非同期関数（Trueを返すと成功、Falseまたは例外で失敗）
+            max_retries: 最大リトライ回数
+            base_delay: 基本待機時間（秒）
+            operation_name: 操作名（ログ用）
+        
+        Returns:
+            関数の戻り値（成功時、True）
+        
+        Raises:
+            最後の試行で発生した例外、またはすべてのリトライが失敗した場合にFalseを返す
+        """
+        last_exception = None
+        
+        for attempt in range(max_retries):
+            try:
+                result = await func()
+                if result:
+                    return result
+                # Falseが返された場合もリトライ
+                attempt_num = attempt + 1
+                if attempt_num < max_retries:
+                    delay = base_delay * (2 ** attempt)
+                    self.logger.warning(
+                        f"{operation_name}が失敗しました (試行 {attempt_num}/{max_retries}): Falseが返されました"
+                    )
+                    self.logger.info(f"{delay:.1f}秒後にリトライします...")
+                    await asyncio.sleep(delay)
+                else:
+                    self.logger.error(
+                        f"{operation_name}が{max_retries}回試行後も失敗しました"
+                    )
+                    return False
+            except Exception as e:
+                last_exception = e
+                attempt_num = attempt + 1
+                
+                if attempt_num < max_retries:
+                    # 指数バックオフ: 1秒, 2秒, 4秒, ...
+                    delay = base_delay * (2 ** attempt)
+                    self.logger.warning(
+                        f"{operation_name}が失敗しました (試行 {attempt_num}/{max_retries}): {e}"
+                    )
+                    self.logger.info(f"{delay:.1f}秒後にリトライします...")
+                    await asyncio.sleep(delay)
+                else:
+                    self.logger.error(
+                        f"{operation_name}が{max_retries}回試行後も失敗しました: {e}"
+                    )
+                    raise last_exception
+        
+        # すべてのリトライが失敗した場合（Falseが返された場合）
+        return False
         
     async def execute_booking(self, slot_info: Dict, page: Page) -> bool:
         """予約を実行"""
@@ -45,24 +102,46 @@ class AirReserveBooker:
                 self.logger.info("DRY_RUNモード: 実際の予約は実行しません")
                 return True
                 
-            # 1. 予約リンクをクリック
-            if not await self._click_reservation_link(slot_info, page):
+            # 1. 予約リンクをクリック（リトライ付き）
+            async def click_link():
+                return await self._click_reservation_link(slot_info, page)
+            
+            if not await self._retry_with_backoff(click_link, max_retries=3, operation_name="予約リンククリック"):
                 return False
                 
-            # 2. メニュー選択
-            if not await self._select_menu(page):
+            # 2. メニュー選択（リトライ付き）
+            async def select_menu():
+                return await self._select_menu(page)
+            
+            if not await self._retry_with_backoff(select_menu, max_retries=2, operation_name="メニュー選択"):
                 return False
                 
-            # 3. 日時選択
-            if not await self._select_datetime(page):
+            # 3. 日時選択（リトライ付き）
+            async def select_datetime():
+                return await self._select_datetime(page)
+            
+            if not await self._retry_with_backoff(select_datetime, max_retries=2, operation_name="日時選択"):
                 return False
                 
-            # 4. 予約者情報入力
-            if not await self._fill_booking_form(page):
+            # 4. メニュー詳細ページの送信（確認画面へ遷移、リトライ付き）
+            async def submit_form():
+                return await self._submit_menu_detail_form(page)
+            
+            if not await self._retry_with_backoff(submit_form, max_retries=3, operation_name="フォーム送信"):
                 return False
-                
-            # 5. 確認・予約完了
-            if not await self._confirm_booking(page):
+            
+            # 5. 予約者情報入力（リトライ付き）
+            async def fill_form():
+                return await self._fill_booking_form(page)
+            
+            if not await self._retry_with_backoff(fill_form, max_retries=2, operation_name="フォーム入力"):
+                return False
+            
+            # 6. 確認・予約完了（リトライ付き）
+            async def confirm():
+                return await self._confirm_booking(page)
+            
+            if not await self._retry_with_backoff(confirm, max_retries=3, operation_name="予約確認"):
                 return False
                 
             self.logger.info("予約が正常に完了しました")
@@ -155,8 +234,22 @@ class AirReserveBooker:
             return True
     
     async def _select_menu(self, page: Page) -> bool:
-        """メニューを選択"""
+        """メニューを選択（メニュー詳細ページでは参加人数を設定）"""
         try:
+            # メニュー詳細ページの場合、参加人数フィールドを確認
+            # 調査結果: name="lessonEntryPaxCnt", id="lessonEntryPaxCnt"
+            lesson_entry_field = await page.query_selector('#lessonEntryPaxCnt, input[name="lessonEntryPaxCnt"]')
+            if lesson_entry_field and await lesson_entry_field.is_visible():
+                # 参加人数が既に設定されているか確認
+                current_value = await lesson_entry_field.input_value()
+                if not current_value or current_value == "0":
+                    await lesson_entry_field.fill("1")  # デフォルトで1人
+                    self.logger.info("参加人数を1に設定しました")
+                else:
+                    self.logger.info(f"参加人数は既に設定されています: {current_value}")
+                await asyncio.sleep(0.5)
+                return True
+            
             # メニュー選択の一般的なパターンを試行
             menu_selectors = [
                 'input[type="radio"][name*="menu"]',
@@ -218,92 +311,205 @@ class AirReserveBooker:
             self.logger.error(f"日時選択エラー: {e}")
             return False
             
-    async def _fill_booking_form(self, page: Page) -> bool:
-        """予約フォームに入力"""
+    async def _submit_menu_detail_form(self, page: Page) -> bool:
+        """メニュー詳細フォームを送信して確認画面へ遷移"""
         try:
-            # 名前入力
+            # フォームIDを確認（調査結果: id="menuDetailForm"）
+            form = await page.query_selector('#menuDetailForm, form[action*="confirm"]')
+            if not form:
+                self.logger.warning("メニュー詳細フォームが見つかりません（スキップ）")
+                return True  # フォームが存在しない場合はスキップ
+            
+            # 送信ボタンを探す（複数のパターンを試行）
+            submit_selectors = [
+                'button[type="submit"]',
+                'input[type="submit"]',
+                'button:has-text("確認")',
+                'button:has-text("次へ")',
+                'button:has-text("予約")',
+                'form button',
+                '.submit-button',
+                '.confirm-button'
+            ]
+            
+            submit_button = None
+            for selector in submit_selectors:
+                button = await page.query_selector(selector)
+                if button and await button.is_visible() and await button.is_enabled():
+                    submit_button = button
+                    self.logger.info(f"送信ボタンを見つけました: {selector}")
+                    break
+            
+            if not submit_button:
+                # ボタンが見つからない場合、フォームを直接送信
+                self.logger.info("送信ボタンが見つかりません。フォームを直接送信します...")
+                await form.evaluate('form => form.submit()')
+                await asyncio.sleep(2)
+            else:
+                await submit_button.click()
+                await asyncio.sleep(2)  # ページ遷移待機
+            
+            # ページ遷移を待機
+            await page.wait_for_load_state("networkidle", timeout=10000)
+            
+            # 確認画面に遷移したか確認
+            current_url = page.url
+            if "confirm" in current_url.lower():
+                self.logger.info("確認画面に遷移しました")
+                return True
+            else:
+                self.logger.warning(f"確認画面への遷移が確認できませんでした。現在のURL: {current_url}")
+                return True  # エラーでも続行（予約期間外などの可能性）
+            
+        except Exception as e:
+            self.logger.error(f"メニュー詳細フォーム送信エラー: {e}")
+            return False
+    
+    async def _fill_booking_form(self, page: Page) -> bool:
+        """予約フォームに入力（確認画面での予約者情報入力）"""
+        try:
+            # 確認画面にいるか確認
+            current_url = page.url
+            if "confirm" not in current_url.lower():
+                self.logger.warning("確認画面ではないため、フォーム入力をスキップします")
+                return True
+            
+            # 名前入力（複数のパターンを試行）
             name_selectors = [
                 'input[name*="name"]',
                 'input[name*="姓名"]',
                 'input[name*="氏名"]',
-                '#name, #fullname'
+                'input[name*="予約者"]',
+                'input[id*="name"]',
+                'input[id*="Name"]',
+                '#name, #fullname, #bookerName'
             ]
             
+            name_filled = False
             for selector in name_selectors:
                 element = await page.query_selector(selector)
-                if element and await element.is_visible():
+                if element and await element.is_visible() and await element.is_enabled():
                     await element.fill(self.booker_name)
-                    self.logger.info(f"名前を入力: {self.booker_name}")
+                    self.logger.info(f"名前を入力: {self.booker_name} (selector: {selector.xpath if hasattr(selector, 'xpath') else selector})")
+                    name_filled = True
                     break
+            
+            if not name_filled:
+                self.logger.warning("名前入力フィールドが見つかりませんでした")
                     
             # メールアドレス入力
             email_selectors = [
                 'input[name*="email"]',
                 'input[name*="mail"]',
+                'input[name*="メール"]',
                 'input[type="email"]',
-                '#email, #mail'
+                'input[id*="email"]',
+                'input[id*="mail"]',
+                '#email, #mail, #bookerEmail'
             ]
             
+            email_filled = False
             for selector in email_selectors:
                 element = await page.query_selector(selector)
-                if element and await element.is_visible():
+                if element and await element.is_visible() and await element.is_enabled():
                     await element.fill(self.booker_email)
                     self.logger.info(f"メールアドレスを入力: {self.booker_email}")
+                    email_filled = True
                     break
+            
+            if not email_filled:
+                self.logger.warning("メールアドレス入力フィールドが見つかりませんでした")
                     
             # 電話番号入力
             phone_selectors = [
                 'input[name*="phone"]',
                 'input[name*="tel"]',
                 'input[name*="電話"]',
-                '#phone, #tel'
+                'input[name*="連絡先"]',
+                'input[type="tel"]',
+                'input[id*="phone"]',
+                'input[id*="tel"]',
+                '#phone, #tel, #bookerPhone'
             ]
             
+            phone_filled = False
             for selector in phone_selectors:
                 element = await page.query_selector(selector)
-                if element and await element.is_visible():
+                if element and await element.is_visible() and await element.is_enabled():
                     await element.fill(self.booker_phone)
                     self.logger.info(f"電話番号を入力: {self.booker_phone}")
+                    phone_filled = True
                     break
+            
+            if not phone_filled:
+                self.logger.warning("電話番号入力フィールドが見つかりませんでした")
                     
             # お子様の名前入力
             child_name_selectors = [
                 'input[name*="child"]',
                 'input[name*="子供"]',
                 'input[name*="お子様"]',
-                '#child-name'
+                'input[name*="子ども"]',
+                'input[id*="child"]',
+                '#child-name, #childName'
             ]
             
+            child_name_filled = False
             for selector in child_name_selectors:
                 element = await page.query_selector(selector)
-                if element and await element.is_visible():
+                if element and await element.is_visible() and await element.is_enabled():
                     await element.fill(self.child_name)
                     self.logger.info(f"お子様の名前を入力: {self.child_name}")
+                    child_name_filled = True
                     break
+            
+            if not child_name_filled:
+                self.logger.warning("お子様の名前入力フィールドが見つかりませんでした")
                     
             # 年齢入力
             age_selectors = [
                 'input[name*="age"]',
                 'input[name*="年齢"]',
+                'input[name*="月齢"]',
                 'select[name*="age"]',
-                '#age'
+                'select[name*="年齢"]',
+                'input[id*="age"]',
+                'select[id*="age"]',
+                '#age, #childAge'
             ]
             
+            age_filled = False
             for selector in age_selectors:
                 element = await page.query_selector(selector)
-                if element and await element.is_visible():
-                    if await element.get_attribute('tagName') == 'SELECT':
+                if element and await element.is_visible() and await element.is_enabled():
+                    tag_name = await element.evaluate('el => el.tagName')
+                    if tag_name == 'SELECT':
                         await element.select_option(value=self.child_age)
                     else:
                         await element.fill(self.child_age)
                     self.logger.info(f"年齢を入力: {self.child_age}")
+                    age_filled = True
                     break
-                    
+            
+            if not age_filled:
+                self.logger.warning("年齢入力フィールドが見つかりませんでした")
+            
+            # 入力後の待機
             await asyncio.sleep(1)
+            
+            # 必須フィールドが入力されているか確認
+            if not name_filled or not email_filled or not phone_filled:
+                self.logger.warning("一部の必須フィールドが入力されていません")
+                # スクリーンショットを保存してデバッグ用
+                screenshot_path = await self.take_screenshot(page, "form_input_partial")
+                self.logger.info(f"デバッグ用スクリーンショットを保存: {screenshot_path}")
+            
             return True
             
         except Exception as e:
             self.logger.error(f"フォーム入力エラー: {e}")
+            screenshot_path = await self.take_screenshot(page, "form_input_error")
+            self.logger.info(f"エラー時のスクリーンショットを保存: {screenshot_path}")
             return False
             
     async def _confirm_booking(self, page: Page) -> bool:

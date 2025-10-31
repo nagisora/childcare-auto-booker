@@ -367,6 +367,28 @@ class AirReserveScraper:
                         self.logger.info(f"新規予約枠を {len(new_slots)} 件発見:")
                         for slot in new_slots:
                             self.logger.info(f"  - {slot['text']} ({slot['href']})")
+                        
+                        # bookerが設定されている場合、予約を試行
+                        if self.booker:
+                            for slot in new_slots:
+                                # 希望条件に合致する枠か確認
+                                if self.booker.is_preferred_slot(slot):
+                                    self.logger.info(f"希望条件に合致する枠を発見: {slot['text']}")
+                                    self.logger.info("予約を実行します...")
+                                    
+                                    # 予約を実行
+                                    success = await self.booker.execute_booking(slot, self.page)
+                                    
+                                    if success:
+                                        self.logger.info(f"予約が成功しました: {slot['text']}")
+                                        # 予約成功後は監視を終了（オプション）
+                                        # break  # 複数の枠を予約する場合はコメントアウト
+                                    else:
+                                        self.logger.warning(f"予約が失敗しました: {slot['text']}")
+                                else:
+                                    self.logger.debug(f"希望条件に合致しないためスキップ: {slot['text']}")
+                        else:
+                            self.logger.debug("bookerが設定されていないため、予約を実行しません")
                             
                     last_slots = current_slots
                     
