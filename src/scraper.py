@@ -126,7 +126,7 @@ class AirReserveScraper:
                 self.logger.info(f"週 {week_num + 1}/{max_weeks} を確認中...")
                 
                 # 現在のページで予約可能枠を検索
-                slots = await self._get_slots_from_current_page()
+                slots = await self._get_slots_from_current_page(week_num=week_num)
                 all_available_slots.extend(slots)
                 
                 # 次週へ移動（最後の週でない場合）
@@ -194,8 +194,12 @@ class AirReserveScraper:
         days_until_event = (event_date - now).days
         return days_until_event <= 14
     
-    async def _get_slots_from_current_page(self) -> List[Dict]:
-        """現在のページから予約可能枠を取得"""
+    async def _get_slots_from_current_page(self, week_num: int = 0) -> List[Dict]:
+        """現在のページから予約可能枠を取得
+        
+        Args:
+            week_num: 週番号（0から始まる、検出時点を記録するため）
+        """
         try:
             # テストサイトモードの場合、週の開始日を取得
             week_start_date = None
@@ -226,34 +230,117 @@ class AirReserveScraper:
                     # 要素のテキストと属性を取得
                     text = await element.inner_text()
                     
-                    # リンク要素を探す（dataLinkBox内のa要素）
-                    link_element = await element.query_selector('a')
+                    # デバッグ用: テキスト内容をログに出力
+                    if self.debug:
+                        self.logger.debug(f"要素 {idx+1} のテキスト: {text[:100]}")
+                    
+                    # リンク要素を探す（dataLinkBox内のa要素、またはdataLinkBox要素自体）
+                    href = None
+                    link_element = None
+                    
+                    # dataLinkBox要素自体がa要素の場合がある（テストサイト）
+                    tag_name = await element.evaluate('el => el.tagName')
+                    if tag_name == 'A':
+                        link_element = element
+                    
+                    # 内部のa要素を探す
                     if not link_element:
-                        continue
+                        link_element = await element.query_selector('a')
+                    
+                    if link_element:
+                        # a要素がある場合
+                        href = await link_element.get_attribute('href')
+                        # hrefが空文字列の場合、dataLinkBox要素自体をクリック可能として扱う
+                        if not href or href == '':
+                            href = 'dataLinkBox:' + text.strip()  # 識別用の疑似href
+                        class_name = await element.get_attribute('class')
+                    else:
+                        # a要素がない場合、dataLinkBox要素自体からhrefを取得
+                        href = await element.get_attribute('href')
+                        class_name = await element.get_attribute('class')
                         
-                    href = await link_element.get_attribute('href')
-                    class_name = await element.get_attribute('class')
+                    if not href:
+                        # data属性からURLを取得
+                        data_href = await element.get_attribute('data-href')
+                        if data_href:
+                            href = data_href
+                        
+                        if not href:
+                            # JavaScriptでdata属性やonclickからURLを取得
+                            try:
+                                js_href = await element.evaluate('''el => {
+                                    // data属性を確認
+                                    if (el.dataset && el.dataset.href) return el.dataset.href;
+                                    if (el.dataset && el.dataset.url) return el.dataset.url;
+                                    
+                                    // onclick属性を確認
+                                    if (el.onclick) {
+                                        const onclickStr = el.onclick.toString();
+                                        const match = onclickStr.match(/['"]([^'"]+)['"]/);
+                                        if (match) return match[1];
+                                    }
+                                    
+                                    // 親要素を確認
+                                    let parent = el.parentElement;
+                                    while (parent) {
+                                        if (parent.href) return parent.href;
+                                        if (parent.dataset && parent.dataset.href) return parent.dataset.href;
+                                        parent = parent.parentElement;
+                                    }
+                                    return null;
+                                }''')
+                                if js_href:
+                                    href = js_href
+                            except Exception as e:
+                                if self.debug:
+                                    self.logger.debug(f"JavaScriptでのURL取得に失敗: {e}")
+                    
+                    if not href:
+                        if self.debug:
+                            self.logger.debug(f"要素 {idx+1}: hrefが見つかりませんでした（スキップ）")
+                        continue
+                    
+                    if self.debug:
+                        self.logger.debug(f"要素 {idx+1}: href={href}, class={class_name}")
                     
                     # テストサイトモードの場合、14日前チェック
+                    # ただし、フォーム入力テストのために残0枠も検出したい場合はスキップする
                     if self.test_site_mode and week_start_date:
                         # イベントの曜日を推定（週の何日目か）
                         # カレンダーは週表示で、各日に複数イベントがある
                         # 簡易的に、週の開始日から6日以内と仮定
                         event_date = week_start_date + timedelta(days=min(idx, 6))
                         
-                        if not self._is_within_14_days(event_date):
+                        # 残0の場合はフォーム入力テストのために14日前チェックをスキップ
+                        if '残0' in text.lower():
+                            self.logger.debug(f"残0枠のため14日前チェックをスキップ: {event_date.strftime('%Y-%m-%d')}")
+                        elif not self._is_within_14_days(event_date):
                             self.logger.debug(f"14日前より先のイベントをスキップ: {event_date.strftime('%Y-%m-%d')}")
                             continue
                     
                     # 予約可能な要素かチェック
-                    if self._is_available_slot(text, href, class_name):
+                    # hrefが空文字列の場合、疑似hrefを作成
+                    if not href or href == '':
+                        href = 'dataLinkBox:' + text.strip()
+                    
+                    is_available = href.startswith('dataLinkBox:') or self._is_available_slot(text, href, class_name)
+                    
+                    if self.debug:
+                        self.logger.debug(f"要素 {idx+1}: is_available={is_available}, href starts with dataLinkBox: {href.startswith('dataLinkBox:') if href else False}, _is_available_slot: {self._is_available_slot(text, href, class_name) if href and not href.startswith('dataLinkBox:') else 'N/A'}")
+                    
+                    if is_available:
                         slot_info = {
                             'text': text.strip(),
                             'href': href,
                             'class': class_name,
                             'selector': selector,
-                            'timestamp': datetime.now()
+                            'timestamp': datetime.now(),
+                            'week_url': self.page.url,  # 検出時点のページURLを保持
+                            'week_number': week_num + 1,  # 検出時点の週番号（1から始まる）
+                            'week_start_date': week_start_date.strftime('%Y-%m-%d') if week_start_date else None  # 検出時点の週開始日
                         }
+                        if self.debug:
+                            self.logger.debug(f"予約枠を追加 (週{slot_info['week_number']}): {slot_info['text'][:50]}...")
                         available_slots.append(slot_info)
                         
                 except Exception as e:
@@ -286,7 +373,9 @@ class AirReserveScraper:
             return False
         
         # 明確な除外キーワード（残0は先にチェック）
-        if '残0' in text_lower:
+        # ただし、テストサイトモードでフォーム入力テストのため、残0も許可する場合がある
+        # （実際の予約はできないが、フォーム入力のテストには使える）
+        if '残0' in text_lower and not self.test_site_mode:
             return False
             
         # その他の除外キーワード

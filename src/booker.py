@@ -158,20 +158,86 @@ class AirReserveBooker:
             if not href:
                 self.logger.error("予約リンクが見つかりません")
                 return False
-                
-            # 相対URLの場合は絶対URLに変換
-            if href.startswith('/'):
-                base_url = os.getenv("TARGET_URL", "https://airrsv.net/kokoroto-azukari/calendar")
-                href = base_url.rstrip('/') + href
-                
-            self.logger.info(f"予約ページに移動: {href}")
             
-            # 予約ページに移動
-            response = await page.goto(href, wait_until="networkidle", timeout=30000)
-            
-            if not response or response.status != 200:
-                self.logger.error(f"予約ページ読み込み失敗: {response.status if response else 'No response'}")
-                return False
+            # 疑似href（dataLinkBox:で始まる）の場合は要素を再検索してクリック
+            if href.startswith('dataLinkBox:'):
+                # 疑似hrefから元のテキストを抽出
+                display_text = href.replace('dataLinkBox:', '').strip()
+                
+                # slot_infoに保存されている情報を取得
+                week_number = slot_info.get('week_number')  # 検出時点の週番号
+                week_start_date = slot_info.get('week_start_date')  # 検出時点の週開始日
+                week_url = slot_info.get('week_url')  # 検出時点のページURL
+                
+                # 週番号がある場合、その週まで移動する
+                if week_number:
+                    self.logger.info(f"週{week_number}に移動します... (週開始日: {week_start_date})")
+                    target_url = os.getenv("TARGET_URL", "https://airrsv.net/kokoroto-azukari/calendar")
+                    await page.goto(target_url, wait_until="networkidle", timeout=30000)
+                    await asyncio.sleep(1)
+                    
+                    # 指定された週まで「次週」ボタンをクリック
+                    for i in range(week_number - 1):
+                        next_button = await page.query_selector('.ctlListItem.listNext')
+                        if next_button:
+                            await next_button.click()
+                            await asyncio.sleep(0.5)
+                            self.logger.debug(f"週{i + 2}に移動しました")
+                        else:
+                            self.logger.warning(f"週{week_number}まで移動できませんでした（次週ボタンが見つかりません）")
+                            break
+                elif week_url:
+                    # 週番号がない場合、URLで移動
+                    self.logger.info(f"検出時点のページに戻ります: {week_url}")
+                    await page.goto(week_url, wait_until="networkidle", timeout=30000)
+                    await asyncio.sleep(1)
+                
+                self.logger.info(f"dataLinkBox要素を検索してクリックします... (テキスト: {display_text[:50]}...)")
+                try:
+                    # 現在のページで対応するdataLinkBox要素を検索
+                    elements = await page.query_selector_all('.dataLinkBox.js-dataLinkBox')
+                    
+                    clicked = False
+                    matched_elements = []
+                    for element in elements:
+                        element_text = await element.inner_text()
+                        # テキストが一致する要素を記録
+                        if display_text in element_text or element_text in display_text:
+                            matched_elements.append((element, element_text))
+                    
+                    # 週開始日がある場合、さらに絞り込み（オプション）
+                    if week_start_date and matched_elements:
+                        self.logger.debug(f"週開始日 {week_start_date} に基づいて要素を選択します")
+                    
+                    # 最初に一致した要素をクリック
+                    if matched_elements:
+                        element, element_text = matched_elements[0]
+                        await element.click()
+                        await asyncio.sleep(2)  # ページ遷移待機
+                        self.logger.info(f"クリック後のURL: {page.url}")
+                        clicked = True
+                    
+                    if not clicked:
+                        self.logger.error(f"対応するdataLinkBox要素が見つかりませんでした (検索対象: {len(elements)}個の要素)")
+                        return False
+                except Exception as e:
+                    self.logger.error(f"dataLinkBox要素のクリックに失敗: {e}")
+                    return False
+            else:
+                # 通常のhrefの場合
+                # 相対URLの場合は絶対URLに変換
+                if href.startswith('/'):
+                    base_url = os.getenv("TARGET_URL", "https://airrsv.net/kokoroto-azukari/calendar")
+                    href = base_url.rstrip('/') + href
+                    
+                self.logger.info(f"予約ページに移動: {href}")
+                
+                # 予約ページに移動
+                response = await page.goto(href, wait_until="networkidle", timeout=30000)
+                
+                if not response or response.status != 200:
+                    self.logger.error(f"予約ページ読み込み失敗: {response.status if response else 'No response'}")
+                    return False
                 
             # エラーメッセージのチェック（予約受付期間外かどうか）
             is_available = await self._check_reservation_availability(page)
@@ -368,11 +434,15 @@ class AirReserveBooker:
     async def _fill_booking_form(self, page: Page) -> bool:
         """予約フォームに入力（確認画面での予約者情報入力）"""
         try:
-            # 確認画面にいるか確認
+            # フォーム入力ページまたは確認画面にいるか確認
             current_url = page.url
-            if "confirm" not in current_url.lower():
-                self.logger.warning("確認画面ではないため、フォーム入力をスキップします")
+            # フォーム入力ページのURLパターン: /booking/lesson/visitor/regist/ または confirm を含む
+            is_form_page = "/booking/" in current_url or "visitor/regist" in current_url or "confirm" in current_url.lower()
+            if not is_form_page:
+                self.logger.warning(f"フォーム入力ページではないため、フォーム入力をスキップします (URL: {current_url})")
                 return True
+            
+            self.logger.info(f"フォーム入力ページを検出しました: {current_url}")
             
             # 名前入力（複数のパターンを試行）
             name_selectors = [
@@ -380,22 +450,75 @@ class AirReserveBooker:
                 'input[name*="姓名"]',
                 'input[name*="氏名"]',
                 'input[name*="予約者"]',
+                'input[name*="保護者"]',
                 'input[id*="name"]',
                 'input[id*="Name"]',
+                'input[placeholder*="氏名"]',
+                'input[placeholder*="名前"]',
+                'input[placeholder*="姓名"]',
+                'label:has-text("氏名") + input',
+                'label:has-text("名前") + input',
+                'label:has-text("予約者") + input',
                 '#name, #fullname, #bookerName'
             ]
             
             name_filled = False
             for selector in name_selectors:
-                element = await page.query_selector(selector)
-                if element and await element.is_visible() and await element.is_enabled():
-                    await element.fill(self.booker_name)
-                    self.logger.info(f"名前を入力: {self.booker_name} (selector: {selector.xpath if hasattr(selector, 'xpath') else selector})")
-                    name_filled = True
-                    break
+                try:
+                    element = await page.query_selector(selector)
+                    if element:
+                        is_visible = await element.is_visible()
+                        is_enabled = await element.is_enabled()
+                        if is_visible and is_enabled:
+                            await element.fill(self.booker_name)
+                            self.logger.info(f"名前を入力: {self.booker_name} (selector: {selector})")
+                            name_filled = True
+                            break
+                        else:
+                            self.logger.debug(f"名前フィールドが見つかりましたが、visible={is_visible}, enabled={is_enabled}: {selector}")
+                    else:
+                        self.logger.debug(f"名前フィールドが見つかりませんでした: {selector}")
+                except Exception as e:
+                    self.logger.debug(f"名前フィールド検索エラー ({selector}): {e}")
+                    continue
             
             if not name_filled:
-                self.logger.warning("名前入力フィールドが見つかりませんでした")
+                # Airリザーブのフォームは姓（lastNm）と名（firstNm）に分かれている
+                self.logger.debug("標準的な名前フィールドが見つかりませんでした。姓・名フィールドを試行します...")
+                
+                # 姓と名に分割（スペースまたは中点で分割、または全体を姓または名として扱う）
+                name_parts = self.booker_name.replace('・', ' ').split(' ', 1)
+                last_name = name_parts[0] if len(name_parts) > 0 else self.booker_name
+                first_name = name_parts[1] if len(name_parts) > 1 else self.booker_name
+                
+                # 姓フィールド（lastNm）
+                last_name_field = await page.query_selector('input[name="lastNm"]')
+                if last_name_field and await last_name_field.is_visible() and await last_name_field.is_enabled():
+                    await last_name_field.fill(last_name)
+                    self.logger.info(f"姓を入力: {last_name}")
+                    name_filled = True
+                
+                # 名フィールド（firstNm）
+                first_name_field = await page.query_selector('input[name="firstNm"]')
+                if first_name_field and await first_name_field.is_visible() and await first_name_field.is_enabled():
+                    await first_name_field.fill(first_name)
+                    self.logger.info(f"名を入力: {first_name}")
+                    name_filled = True
+                
+                if not name_filled:
+                    self.logger.warning("名前入力フィールドが見つかりませんでした（全セレクター試行済み）")
+                    if self.debug:
+                        # すべてのinput要素をリストアップしてデバッグ
+                        all_inputs = await page.query_selector_all('input[type="text"], input:not([type])')
+                        self.logger.debug(f"ページ内のテキスト入力フィールド数: {len(all_inputs)}")
+                        for i, inp in enumerate(all_inputs[:10]):  # 最初の10個だけ
+                            try:
+                                name_attr = await inp.get_attribute('name')
+                                id_attr = await inp.get_attribute('id')
+                                placeholder_attr = await inp.get_attribute('placeholder')
+                                self.logger.debug(f"入力フィールド {i+1}: name={name_attr}, id={id_attr}, placeholder={placeholder_attr}")
+                            except:
+                                pass
                     
             # メールアドレス入力
             email_selectors = [
@@ -450,7 +573,12 @@ class AirReserveBooker:
                 'input[name*="子供"]',
                 'input[name*="お子様"]',
                 'input[name*="子ども"]',
+                'input[name*="こども"]',
                 'input[id*="child"]',
+                'input[placeholder*="お子様"]',
+                'input[placeholder*="子供"]',
+                'label:has-text("お子様") + input',
+                'label:has-text("子供") + input',
                 '#child-name, #childName'
             ]
             
@@ -503,6 +631,45 @@ class AirReserveBooker:
                 # スクリーンショットを保存してデバッグ用
                 screenshot_path = await self.take_screenshot(page, "form_input_partial")
                 self.logger.info(f"デバッグ用スクリーンショットを保存: {screenshot_path}")
+            
+            # 「確認へ進む」ボタンを押す（フォーム送信ではない、確認画面への遷移）
+            self.logger.info("「確認へ進む」ボタンを探しています...")
+            next_button_selectors = [
+                'button[type="submit"]',
+                'input[type="submit"]',
+                'button:has-text("確認")',
+                'button:has-text("確認へ進む")',
+                'button:has-text("次へ")',
+                'button:has-text("進む")',
+                '.next-button',
+                '.confirm-button'
+            ]
+            
+            next_button_clicked = False
+            for selector in next_button_selectors:
+                try:
+                    button = await page.query_selector(selector)
+                    if button and await button.is_visible() and await button.is_enabled():
+                        button_text = await button.inner_text()
+                        # 「送信」「予約確定」などの最終送信ボタンは避ける
+                        if any(keyword in button_text.lower() for keyword in ['送信', '予約確定', '確定', 'submit']):
+                            self.logger.debug(f"最終送信ボタンのためスキップ: {button_text}")
+                            continue
+                        
+                        self.logger.info(f"「確認へ進む」ボタンをクリック: {button_text}")
+                        await button.click()
+                        await asyncio.sleep(2)  # ページ遷移待機
+                        await page.wait_for_load_state("networkidle", timeout=10000)
+                        next_button_clicked = True
+                        self.logger.info(f"確認画面に遷移しました: {page.url}")
+                        break
+                except Exception as e:
+                    self.logger.debug(f"ボタンクリック試行失敗 ({selector}): {e}")
+                    continue
+            
+            if not next_button_clicked:
+                self.logger.warning("「確認へ進む」ボタンが見つかりませんでした（スキップ）")
+                # フォーム入力自体は成功として扱う
             
             return True
             

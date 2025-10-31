@@ -160,20 +160,36 @@ DEBUG=false    # デバッグモード
 
 環境構築が完了したので、次回は安全に段階的テストを行います：
 
-**ステップ1: DRY_RUNモード**
+**お子様情報フィールドの入力対応**
 ```bash
-# DRY_RUNモードでテスト実行（予約実行なし）
-mise run test-dry-run
+# テストサイトでフォーム構造を再調査
+TARGET_URL=https://airrsv.net/platkokoro2020/calendar \
+TEST_SITE_MODE=true \
+DRY_RUN=false \
+STOP_BEFORE_SUBMIT=true \
+HEADLESS=false \
+DEBUG=true \
+python main.py --mode book
+
+# デバッグログでお子様情報フィールドのname属性を確認
+# その後、booker.pyのchild_name_selectorsとage_selectorsを修正
 ```
 
-**ステップ2: STOP_BEFORE_SUBMITモード**
+**ステップ: フォーム入力完全テスト**
 ```bash
-# .envファイルで設定
-DRY_RUN=false
-STOP_BEFORE_SUBMIT=true  # 最終送信ボタンを押さない
-
-# テスト実行（フォーム入力まで実行、実際の予約は発生しない）
-mise run test-monitor
+# 全フィールド入力が成功することを確認
+TARGET_URL=https://airrsv.net/platkokoro2020/calendar \
+TEST_SITE_MODE=true \
+DRY_RUN=false \
+STOP_BEFORE_SUBMIT=true \
+HEADLESS=false \
+DEBUG=false \
+BOOKER_NAME="テスト太郎" \
+BOOKER_EMAIL="test@example.com" \
+BOOKER_PHONE="090-0000-0000" \
+CHILD_NAME="テスト花子" \
+CHILD_AGE="2" \
+python main.py --mode book
 ```
 
 このモードでは：
@@ -263,8 +279,8 @@ git push origin main
 ---
 
 **作成日**: 2024年12月19日  
-**最終更新**: 2025年10月28日（エラーメッセージチェック機能実装完了）  
-**ステータス**: エラーメッセージチェック機能実装完了、テストサイトでの動作確認済み
+**最終更新**: 2025年10月31日（予約実行機能の完成とテスト）  
+**ステータス**: 予約実行機能の実装完了、フォーム入力テスト実施中（お子様情報フィールド対応が残っている）
 
 ## 作業履歴
 
@@ -319,6 +335,40 @@ git push origin main
 **Phase 2: テスト実行**
 5. ✅ venv環境の再構築と依存関係のインストール
 6. ✅ テストサイトでの動作確認
+
+### 2025年10月31日: 予約実行機能の完成とテスト
+
+**Phase 1: リトライ機能とエラーハンドリングの強化**
+1. ✅ `booker.py`に指数バックオフによるリトライ機能を実装（`_retry_with_backoff`メソッド）
+2. ✅ 各予約フローステップにリトライ機能を統合
+3. ✅ エラーログの改善（詳細なエラー情報、スクリーンショットとエラーログの紐付け）
+
+**Phase 2: 週番号管理とフォーム入力機能の改善**
+4. ✅ 複数週スキャン後の予約実行問題を解決（週番号の記録と復元）
+   - `slot_info`に`week_number`と`week_start_date`を保存
+   - `_click_reservation_link`で週番号から該当週へ移動する機能を実装
+5. ✅ フォーム入力ページの検出改善
+   - URLパターン`/booking/lesson/visitor/regist/`にも対応
+6. ✅ 「確認へ進む」ボタンのクリック処理を追加
+   - フォーム入力後に「確認へ進む」ボタンをクリックして確認画面へ遷移
+7. ✅ 名前フィールドの入力対応
+   - Airリザーブのフォーム構造（`lastNm`/`firstNm`）に対応
+   - 名前を姓と名に分割して入力する処理を実装
+
+**Phase 3: テストサイトでの動作確認**
+8. ✅ テストサイトモードでの残0枠検出対応（フォーム入力テストのため）
+   - `_is_available_slot`でテストサイトモードの場合、残0も許可
+   - 14日前チェックを残0枠ではスキップ
+9. ✅ フォーム入力テストの実行
+   - 姓・名の入力成功を確認
+   - 「確認へ進む」ボタンのクリック成功
+   - 確認画面への遷移成功
+   - `STOP_BEFORE_SUBMIT`での最終送信停止を確認
+
+**残りの課題**
+- ⏳ お子様の名前フィールドの入力対応（実際のフィールド名を特定してセレクターを修正）
+- ⏳ 年齢フィールドの入力対応（実際のフィールド名を特定してセレクターを修正）
+- ⏳ 本番サイトでの動作確認
 
 ### 次回の作業
 
