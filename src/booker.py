@@ -24,6 +24,8 @@ class AirReserveBooker:
         
         # 予約者情報
         self.booker_name = os.getenv("BOOKER_NAME", "")
+        self.booker_name_kana = os.getenv("BOOKER_NAME_KANA", "")  # フリガナ（セイ）
+        self.booker_name_kana_mei = os.getenv("BOOKER_NAME_KANA_MEI", "")  # フリガナ（メイ）
         self.booker_email = os.getenv("BOOKER_EMAIL", "")
         self.booker_phone = os.getenv("BOOKER_PHONE", "")
         self.child_name = os.getenv("CHILD_NAME", "")
@@ -505,6 +507,24 @@ class AirReserveBooker:
                     self.logger.info(f"名を入力: {first_name}")
                     name_filled = True
                 
+                # フリガナ（セイ）フィールド（lastNmKn）
+                if self.booker_name_kana:
+                    last_nm_kn_field = await page.query_selector('input[name="lastNmKn"]')
+                    if last_nm_kn_field and await last_nm_kn_field.is_visible() and await last_nm_kn_field.is_enabled():
+                        await last_nm_kn_field.fill(self.booker_name_kana)
+                        self.logger.info(f"フリガナ（セイ）を入力: {self.booker_name_kana}")
+                else:
+                    self.logger.warning("フリガナ（セイ）が設定されていません")
+                
+                # フリガナ（メイ）フィールド（firstNmKn）
+                if self.booker_name_kana_mei:
+                    first_nm_kn_field = await page.query_selector('input[name="firstNmKn"]')
+                    if first_nm_kn_field and await first_nm_kn_field.is_visible() and await first_nm_kn_field.is_enabled():
+                        await first_nm_kn_field.fill(self.booker_name_kana_mei)
+                        self.logger.info(f"フリガナ（メイ）を入力: {self.booker_name_kana_mei}")
+                else:
+                    self.logger.warning("フリガナ（メイ）が設定されていません")
+                
                 if not name_filled:
                     self.logger.warning("名前入力フィールドが見つかりませんでした（全セレクター試行済み）")
                     if self.debug:
@@ -541,9 +561,27 @@ class AirReserveBooker:
                     break
             
             if not email_filled:
+                # Airリザーブのフォーム構造に対応（mailAddress1）
+                mail_address1_field = await page.query_selector('input[name="mailAddress1"]')
+                if mail_address1_field and await mail_address1_field.is_visible() and await mail_address1_field.is_enabled():
+                    await mail_address1_field.fill(self.booker_email)
+                    self.logger.info(f"メールアドレスを入力: {self.booker_email}")
+                    email_filled = True
+            
+            # メールアドレス確認用フィールド（mailAddress1ForCnfrm）
+            if self.booker_email:
+                mail_address1_confirm_field = await page.query_selector('input[name="mailAddress1ForCnfrm"]')
+                if mail_address1_confirm_field and await mail_address1_confirm_field.is_visible() and await mail_address1_confirm_field.is_enabled():
+                    await mail_address1_confirm_field.fill(self.booker_email)
+                    self.logger.info(f"メールアドレス（確認用）を入力: {self.booker_email}")
+            
+            if not email_filled:
                 self.logger.warning("メールアドレス入力フィールドが見つかりませんでした")
                     
             # 電話番号入力
+            # 電話番号のフォーマット: 9-17桁の半角数字（ハイフン除去）
+            phone_normalized = self.booker_phone.replace('-', '').replace('‐', '').replace('ー', '')
+            
             phone_selectors = [
                 'input[name*="phone"]',
                 'input[name*="tel"]',
@@ -559,10 +597,18 @@ class AirReserveBooker:
             for selector in phone_selectors:
                 element = await page.query_selector(selector)
                 if element and await element.is_visible() and await element.is_enabled():
-                    await element.fill(self.booker_phone)
-                    self.logger.info(f"電話番号を入力: {self.booker_phone}")
+                    await element.fill(phone_normalized)
+                    self.logger.info(f"電話番号を入力: {phone_normalized}")
                     phone_filled = True
                     break
+            
+            if not phone_filled:
+                # Airリザーブのフォーム構造に対応（tel1）
+                tel1_field = await page.query_selector('input[name="tel1"]')
+                if tel1_field and await tel1_field.is_visible() and await tel1_field.is_enabled():
+                    await tel1_field.fill(phone_normalized)
+                    self.logger.info(f"電話番号を入力: {phone_normalized}")
+                    phone_filled = True
             
             if not phone_filled:
                 self.logger.warning("電話番号入力フィールドが見つかりませんでした")
