@@ -532,9 +532,15 @@ class AirReserveBooker:
                         await last_nm_kn_field.fill(self.booker_name_kana)
                         self.logger.info(f"フリガナ（セイ）を入力: {self.booker_name_kana}")
                     else:
-                        self.logger.warning("フリガナ（セイ）が設定されていません。フィールドは空のままです")
-                        # 必須フィールドの場合もあるため、空文字列を入力
-                        await last_nm_kn_field.fill("")
+                        self.logger.warning("フリガナ（セイ）が設定されていません。フィールドは未入力のままです（設定値がない場合は入力しません）")
+                        # 設定値がない場合はフィールドに触れない
+                        # 必須フィールドの場合は、フォーム検証でエラーとなるが、
+                        # それは適切な動作（設定が不足しているため）
+                        if self.debug:
+                            # デバッグモードでは必須属性を確認
+                            is_required = await last_nm_kn_field.get_attribute('required')
+                            if is_required:
+                                self.logger.warning("⚠️ フリガナ（セイ）フィールドは必須ですが、設定値がありません")
                 
                 # フリガナ（メイ）フィールド（firstNmKn）
                 first_nm_kn_field = await page.query_selector('input[name="firstNmKn"]')
@@ -543,9 +549,15 @@ class AirReserveBooker:
                         await first_nm_kn_field.fill(self.booker_name_kana_mei)
                         self.logger.info(f"フリガナ（メイ）を入力: {self.booker_name_kana_mei}")
                     else:
-                        self.logger.warning("フリガナ（メイ）が設定されていません。フィールドは空のままです")
-                        # 必須フィールドの場合もあるため、空文字列を入力
-                        await first_nm_kn_field.fill("")
+                        self.logger.warning("フリガナ（メイ）が設定されていません。フィールドは未入力のままです（設定値がない場合は入力しません）")
+                        # 設定値がない場合はフィールドに触れない
+                        # 必須フィールドの場合は、フォーム検証でエラーとなるが、
+                        # それは適切な動作（設定が不足しているため）
+                        if self.debug:
+                            # デバッグモードでは必須属性を確認
+                            is_required = await first_nm_kn_field.get_attribute('required')
+                            if is_required:
+                                self.logger.warning("⚠️ フリガナ（メイ）フィールドは必須ですが、設定値がありません")
                 
                 if not name_filled:
                     self.logger.warning("名前入力フィールドが見つかりませんでした（全セレクター試行済み）")
