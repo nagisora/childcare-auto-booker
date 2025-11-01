@@ -85,10 +85,18 @@ NOTIFY_FAILURE=true
 ### 2. 予約設定
 
 #### TARGET_URL
-- **説明**: 予約ページのURL
+- **説明**: 予約ページのURL（推奨設定方法）
 - **形式**: URL形式
-- **例**: `https://airrsv.net/kokoroto-azukari/calendar`
-- **注意**: 通常は変更不要です
+- **例**: `https://airrsv.net/kokoroto-azukari/calendar`（本番サイト）
+- **例**: `https://airrsv.net/platkokoro2020/calendar`（テストサイト）
+- **注意**: 直接URLを指定する場合はこの環境変数を使用してください。設定されていない場合は`SITE_MODE`で切り替えが可能です
+
+#### SITE_MODE
+- **説明**: サイトモード（TARGET_URLが未設定の場合のみ有効）
+- **形式**: `production` または `test`
+- **例**: `production`（本番サイト、デフォルト）
+- **例**: `test`（テストサイト）
+- **注意**: `TARGET_URL`が設定されている場合は`TARGET_URL`が優先されます。URL管理を一元化するため、テストと本番の切り替えは`.env`ファイルで行えます
 
 #### NEXT_RELEASE_DATETIME
 - **説明**: 次回予約公開日時

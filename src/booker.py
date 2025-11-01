@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Dict, Optional
 from playwright.async_api import Page
 
+from src.config import get_target_url
+
 
 class AirReserveBooker:
     """Airリザーブ予約実行クラス"""
@@ -174,7 +176,7 @@ class AirReserveBooker:
                 # 週番号がある場合、その週まで移動する
                 if week_number:
                     self.logger.info(f"週{week_number}に移動します... (週開始日: {week_start_date})")
-                    target_url = os.getenv("TARGET_URL", "https://airrsv.net/kokoroto-azukari/calendar")
+                    target_url = get_target_url()
                     await page.goto(target_url, wait_until="networkidle", timeout=30000)
                     await asyncio.sleep(1)
                     
@@ -229,7 +231,7 @@ class AirReserveBooker:
                 # 通常のhrefの場合
                 # 相対URLの場合は絶対URLに変換
                 if href.startswith('/'):
-                    base_url = os.getenv("TARGET_URL", "https://airrsv.net/kokoroto-azukari/calendar")
+                    base_url = get_target_url()
                     href = base_url.rstrip('/') + href
                     
                 self.logger.info(f"予約ページに移動: {href}")

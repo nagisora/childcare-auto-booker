@@ -13,13 +13,15 @@ from pathlib import Path
 from typing import List, Dict, Optional
 from playwright.async_api import async_playwright, Browser, Page
 
+from src.config import get_target_url
+
 
 class AirReserveScraper:
     """Airリザーブ予約ページのスクレイピングクラス"""
     
     def __init__(self, booker=None):
         self.logger = logging.getLogger(__name__)
-        self.target_url = os.getenv("TARGET_URL", "https://airrsv.net/kokoroto-azukari/calendar")
+        self.target_url = get_target_url()
         self.headless = os.getenv("HEADLESS", "true").lower() == "true"
         self.debug = os.getenv("DEBUG", "false").lower() == "true"
         
