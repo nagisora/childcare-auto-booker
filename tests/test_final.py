@@ -3,7 +3,13 @@
 最終テスト: 修正後の判定ロジック確認
 """
 import asyncio
+import sys
+from pathlib import Path
 from playwright.async_api import async_playwright
+
+# プロジェクトルートをパスに追加
+sys.path.append(str(Path(__file__).parent.parent))
+from src.config import get_target_url
 
 def is_available_slot(text: str, href: str) -> bool:
     """予約可能枠かどうかを判定（修正版）"""
@@ -44,7 +50,7 @@ async def test():
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
         
-        url = "https://airrsv.net/platkokoro2020/calendar"
+        url = get_target_url()
         print(f"ページ読み込み中: {url}\n")
         await page.goto(url, wait_until="networkidle", timeout=30000)
         

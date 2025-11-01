@@ -1,60 +1,86 @@
 #!/usr/bin/env python3
-"""
-セレクターテスト用スクリプト
-"""
 import asyncio
+import sys
+from pathlib import Path
 from playwright.async_api import async_playwright
 
-async def test_selectors():
+# プロジェクトルートをパスに追加
+sys.path.append(str(Path(__file__).parent.parent))
+from src.config import get_target_url
+
+def is_available_slot(text: str, href: str) -> bool:
+    if not text or not href:
+        return False
+    
+    text_lower = text.lower()
+    
+    # 残0は先にチェック
+    if '残0' in text_lower:
+        return False
+        
+    exclude_keywords = [
+        '満員', '満', '受付終了', '終了', 'disabled', 'unavailable',
+        '予約不可', '不可', 'close', 'closed'
+    ]
+    
+    for keyword in exclude_keywords:
+        if keyword in text_lower:
+            return False
+            
+    include_keywords = [
+        '残', '仮', 'available', '予約可能', '可能', '受付中', '待'
+    ]
+    
+    for keyword in include_keywords:
+        if keyword in text_lower:
+            return True
+            
+    return False
+
+async def test():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
         
-        # ページ読み込み
-        url = "https://airrsv.net/platkokoro2020/calendar"
-        print(f"ページ読み込み中: {url}")
+        url = get_target_url()
+        print(f"ページ読み込み中: {url}\n")
         await page.goto(url, wait_until="networkidle", timeout=30000)
         
-        # ページタイトル
-        title = await page.title()
-        print(f"ページタイトル: {title}")
-        
-        # スクリーンショット
-        await page.screenshot(path="screenshots/test_selector.png", full_page=True)
-        print("スクリーンショット保存: screenshots/test_selector.png")
-        
-        # セレクターテスト
-        selectors_to_test = [
-            '.dataLinkBox.js-dataLinkBox',
-            '.dataLinkBox',
-            '.js-dataLinkBox',
-            '[class*="dataLinkBox"]',
-            '[class*="LinkBox"]',
-            '.ctlListItem.listNext',
-        ]
-        
-        for selector in selectors_to_test:
-            elements = await page.query_selector_all(selector)
-            print(f"{selector}: {len(elements)} 個の要素")
+        all_slots = []
+        for week in range(7):
+            print(f"=== 週 {week + 1}/7 ===")
             
-            if len(elements) > 0 and len(elements) <= 3:
-                for i, elem in enumerate(elements[:3]):
-                    text = await elem.inner_text()
-                    print(f"  [{i}] テキスト: {text[:50]}")
+            elements = await page.query_selector_all('.dataLinkBox.js-dataLinkBox')
+            print(f"要素数: {len(elements)}")
+            
+            for elem in elements:
+                text = await elem.inner_text()
+                link_elem = await elem.query_selector('a')
+                href = await link_elem.get_attribute('href') if link_elem else None
+                
+                available = is_available_slot(text, href)
+                status = "✓ 予約可能" if available else "✗ 予約不可"
+                
+                print(f"{status}: {text[:60].replace(chr(10), ' ')}")
+                
+                if available:
+                    all_slots.append({'text': text, 'href': href, 'week': week + 1})
+            
+            if week < 6:
+                next_button = await page.query_selector('.ctlListItem.listNext')
+                if next_button:
+                    await next_button.click()
+                    await asyncio.sleep(0.5)
+                else:
+                    break
+            print()
         
-        # 全リンクを確認
-        all_links = await page.query_selector_all('a')
-        print(f"\n全リンク数: {len(all_links)}")
-        
-        # 「残」「仮」を含むテキストを検索
-        for link in all_links[:20]:  # 最初の20個だけ
-            text = await link.inner_text()
-            if '残' in text or '仮' in text or '待' in text:
-                href = await link.get_attribute('href')
-                print(f"  予約関連リンク: {text.strip()} -> {href}")
+        print(f"\n=== 結果 ===")
+        print(f"合計予約可能枠: {len(all_slots)} 件")
+        for slot in all_slots:
+            print(f"  週{slot['week']}: {slot['text'][:40].replace(chr(10), ' ')}")
         
         await browser.close()
 
 if __name__ == "__main__":
-    asyncio.run(test_selectors())
-
+    asyncio.run(test())

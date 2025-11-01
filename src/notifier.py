@@ -5,8 +5,9 @@
 """
 
 import logging
-import os
 from typing import Optional
+
+from src.config import get_notify_success, get_notify_failure
 
 
 class NotificationManager:
@@ -14,8 +15,8 @@ class NotificationManager:
     
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        self.notify_success = os.getenv("NOTIFY_SUCCESS", "true").lower() == "true"
-        self.notify_failure = os.getenv("NOTIFY_FAILURE", "true").lower() == "true"
+        self.notify_success = get_notify_success()
+        self.notify_failure = get_notify_failure()
         
     def notify_booking_success(self, slot_info: dict):
         """予約成功の通知"""

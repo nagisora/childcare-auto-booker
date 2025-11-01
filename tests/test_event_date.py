@@ -4,15 +4,21 @@
 """
 import asyncio
 import re
+import sys
 from datetime import datetime, timedelta
+from pathlib import Path
 from playwright.async_api import async_playwright
+
+# プロジェクトルートをパスに追加
+sys.path.append(str(Path(__file__).parent.parent))
+from src.config import get_target_url
 
 async def test():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
         
-        url = "https://airrsv.net/platkokoro2020/calendar"
+        url = get_target_url()
         print(f"ページ読み込み中: {url}\n")
         await page.goto(url, wait_until="networkidle", timeout=30000)
         

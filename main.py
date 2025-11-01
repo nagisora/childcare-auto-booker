@@ -23,6 +23,7 @@ sys.path.append(str(Path(__file__).parent))
 from src.scraper import AirReserveScraper
 from src.booker import AirReserveBooker
 from src.notifier import NotificationManager
+from src.config import validate_required_config, ConfigError
 
 
 def setup_logging():
@@ -81,6 +82,14 @@ async def main_async():
     # ログ設定
     setup_logging()
     logger = logging.getLogger(__name__)
+    
+    # 設定のバリデーション
+    try:
+        validate_required_config()
+    except ConfigError as e:
+        logger.error(f"設定エラー: {e}")
+        logger.error("必須設定項目が不足しています。.envファイルを確認してください。")
+        sys.exit(1)
     
     logger.info(f"Airリザーブ自動予約システム開始 - モード: {args.mode}")
     

@@ -6,11 +6,27 @@ Airリザーブ予約フロー自動化機能
 
 import asyncio
 import logging
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
 from playwright.async_api import Page
+
+from src.config import (
+    get_target_url,
+    get_dry_run,
+    get_stop_before_submit,
+    get_require_manual_confirmation,
+    get_booker_name,
+    get_booker_name_kana,
+    get_booker_name_kana_mei,
+    get_booker_email,
+    get_booker_phone,
+    get_child_name,
+    get_child_age,
+    get_preferred_days,
+    get_preferred_time_start,
+    get_preferred_time_end,
+)
 
 
 class AirReserveBooker:
@@ -18,23 +34,23 @@ class AirReserveBooker:
     
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        self.dry_run = os.getenv("DRY_RUN", "false").lower() == "true"
-        self.stop_before_submit = os.getenv("STOP_BEFORE_SUBMIT", "true").lower() == "true"
-        self.require_manual_confirmation = os.getenv("REQUIRE_MANUAL_CONFIRMATION", "false").lower() == "true"
+        self.dry_run = get_dry_run()
+        self.stop_before_submit = get_stop_before_submit()
+        self.require_manual_confirmation = get_require_manual_confirmation()
         
         # 予約者情報
-        self.booker_name = os.getenv("BOOKER_NAME", "")
-        self.booker_name_kana = os.getenv("BOOKER_NAME_KANA", "")  # フリガナ（セイ）
-        self.booker_name_kana_mei = os.getenv("BOOKER_NAME_KANA_MEI", "")  # フリガナ（メイ）
-        self.booker_email = os.getenv("BOOKER_EMAIL", "")
-        self.booker_phone = os.getenv("BOOKER_PHONE", "")
-        self.child_name = os.getenv("CHILD_NAME", "")
-        self.child_age = os.getenv("CHILD_AGE", "")
+        self.booker_name = get_booker_name()
+        self.booker_name_kana = get_booker_name_kana()  # フリガナ（セイ）
+        self.booker_name_kana_mei = get_booker_name_kana_mei()  # フリガナ（メイ）
+        self.booker_email = get_booker_email()
+        self.booker_phone = get_booker_phone()
+        self.child_name = get_child_name()
+        self.child_age = get_child_age()
         
         # 希望条件
-        self.preferred_days = os.getenv("PREFERRED_DAYS", "").split(",")
-        self.preferred_time_start = os.getenv("PREFERRED_TIME_START", "09:00")
-        self.preferred_time_end = os.getenv("PREFERRED_TIME_END", "17:00")
+        self.preferred_days = get_preferred_days()
+        self.preferred_time_start = get_preferred_time_start()
+        self.preferred_time_end = get_preferred_time_end()
         
         self.logger.info(f"予約実行クラス初期化完了 (DRY_RUN: {self.dry_run}, STOP_BEFORE_SUBMIT: {self.stop_before_submit})")
     
@@ -174,7 +190,7 @@ class AirReserveBooker:
                 # 週番号がある場合、その週まで移動する
                 if week_number:
                     self.logger.info(f"週{week_number}に移動します... (週開始日: {week_start_date})")
-                    target_url = os.getenv("TARGET_URL", "https://airrsv.net/kokoroto-azukari/calendar")
+                    target_url = get_target_url()
                     await page.goto(target_url, wait_until="networkidle", timeout=30000)
                     await asyncio.sleep(1)
                     
@@ -229,7 +245,7 @@ class AirReserveBooker:
                 # 通常のhrefの場合
                 # 相対URLの場合は絶対URLに変換
                 if href.startswith('/'):
-                    base_url = os.getenv("TARGET_URL", "https://airrsv.net/kokoroto-azukari/calendar")
+                    base_url = get_target_url()
                     href = base_url.rstrip('/') + href
                     
                 self.logger.info(f"予約ページに移動: {href}")
