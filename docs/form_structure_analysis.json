@@ -47,7 +47,7 @@
           "id": null,
           "class": null,
           "placeholder": null,
-          "value": "2593ffef-c41a-4f11-ab84-ff8af33c386e",
+          "value": "15bc771d-86f9-4dd6-a5a2-477ce57d95b2",
           "required": null,
           "visible": false,
           "enabled": true
@@ -59,7 +59,7 @@
           "id": "sid",
           "class": null,
           "placeholder": null,
-          "value": "57905332-1270-419a-a289-eb7ec9571ea0",
+          "value": "052402b2-b003-4c0d-9f58-948b2c6da6a7",
           "required": null,
           "visible": false,
           "enabled": true
@@ -71,7 +71,7 @@
           "id": "token",
           "class": null,
           "placeholder": null,
-          "value": "9a58121b-0ce1-4516-a67b-207f61d456f5",
+          "value": "b927155b-a439-42c9-bfd6-306ce4857c04",
           "required": null,
           "visible": false,
           "enabled": true
@@ -419,7 +419,7 @@
           "id": null,
           "class": null,
           "placeholder": null,
-          "value": "2593ffef-c41a-4f11-ab84-ff8af33c386e",
+          "value": "15bc771d-86f9-4dd6-a5a2-477ce57d95b2",
           "required": null,
           "visible": false,
           "enabled": true
@@ -474,7 +474,7 @@
           "id": null,
           "class": null,
           "placeholder": null,
-          "value": "2593ffef-c41a-4f11-ab84-ff8af33c386e",
+          "value": "15bc771d-86f9-4dd6-a5a2-477ce57d95b2",
           "required": null,
           "visible": false,
           "enabled": true
@@ -486,7 +486,7 @@
           "id": "sid",
           "class": null,
           "placeholder": null,
-          "value": "57905332-1270-419a-a289-eb7ec9571ea0",
+          "value": "052402b2-b003-4c0d-9f58-948b2c6da6a7",
           "required": null,
           "visible": false,
           "enabled": true
@@ -498,7 +498,7 @@
           "id": "token",
           "class": null,
           "placeholder": null,
-          "value": "9a58121b-0ce1-4516-a67b-207f61d456f5",
+          "value": "b927155b-a439-42c9-bfd6-306ce4857c04",
           "required": null,
           "visible": false,
           "enabled": true
@@ -846,7 +846,7 @@
           "id": null,
           "class": null,
           "placeholder": null,
-          "value": "2593ffef-c41a-4f11-ab84-ff8af33c386e",
+          "value": "15bc771d-86f9-4dd6-a5a2-477ce57d95b2",
           "required": null,
           "visible": false,
           "enabled": true
@@ -901,7 +901,7 @@
           "id": null,
           "class": null,
           "placeholder": null,
-          "value": "2593ffef-c41a-4f11-ab84-ff8af33c386e",
+          "value": "15bc771d-86f9-4dd6-a5a2-477ce57d95b2",
           "required": null,
           "visible": false,
           "enabled": true
@@ -913,7 +913,7 @@
           "id": "sid",
           "class": null,
           "placeholder": null,
-          "value": "57905332-1270-419a-a289-eb7ec9571ea0",
+          "value": "052402b2-b003-4c0d-9f58-948b2c6da6a7",
           "required": null,
           "visible": false,
           "enabled": true
@@ -925,7 +925,7 @@
           "id": "token",
           "class": null,
           "placeholder": null,
-          "value": "9a58121b-0ce1-4516-a67b-207f61d456f5",
+          "value": "b927155b-a439-42c9-bfd6-306ce4857c04",
           "required": null,
           "visible": false,
           "enabled": true
@@ -1273,7 +1273,7 @@
           "id": null,
           "class": null,
           "placeholder": null,
-          "value": "2593ffef-c41a-4f11-ab84-ff8af33c386e",
+          "value": "15bc771d-86f9-4dd6-a5a2-477ce57d95b2",
           "required": null,
           "visible": false,
           "enabled": true
@@ -1285,7 +1285,7 @@
     },
     {
       "step": "form_input",
-      "url": "https://airrsv.net/platkokoro2020/calendar/menuDetail/?schdlId=T003CA3800",
+      "url": "https://airrsv.net/platkokoro2020/calendar/menuDetail/confirm/",
       "title": "メニュー詳細｜名古屋市昭和区子育て応援拠点こころと",
       "forms": [
         {
@@ -1328,7 +1328,7 @@
           "id": null,
           "class": null,
           "placeholder": null,
-          "value": "2593ffef-c41a-4f11-ab84-ff8af33c386e",
+          "value": "15bc771d-86f9-4dd6-a5a2-477ce57d95b2",
           "required": null,
           "visible": false,
           "enabled": true
@@ -1340,7 +1340,7 @@
           "id": "sid",
           "class": null,
           "placeholder": null,
-          "value": "57905332-1270-419a-a289-eb7ec9571ea0",
+          "value": "052402b2-b003-4c0d-9f58-948b2c6da6a7",
           "required": null,
           "visible": false,
           "enabled": true
@@ -1352,7 +1352,7 @@
           "id": "token",
           "class": null,
           "placeholder": null,
-          "value": "9a58121b-0ce1-4516-a67b-207f61d456f5",
+          "value": "b927155b-a439-42c9-bfd6-306ce4857c04",
           "required": null,
           "visible": false,
           "enabled": true
@@ -1700,7 +1700,7 @@
           "id": null,
           "class": null,
           "placeholder": null,
-          "value": "2593ffef-c41a-4f11-ab84-ff8af33c386e",
+          "value": "15bc771d-86f9-4dd6-a5a2-477ce57d95b2",
           "required": null,
           "visible": false,
           "enabled": true

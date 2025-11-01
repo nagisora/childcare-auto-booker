@@ -276,22 +276,23 @@ async def inspect_form_structure():
                 step3 = await inspect_page_structure(scraper.page, "after_datetime_selection")
                 form_structure['steps'].append(step3)
             
-            # Step 4: フォーム入力画面の状態
+            # Step 4: メニュー詳細フォーム送信
             logger.info("=" * 60)
-            logger.info("Step 4: フォーム入力画面の状態の調査")
+            logger.info("Step 4: メニュー詳細フォーム送信")
             logger.info("=" * 60)
             
-            # 次へボタンをクリック（もしあれば）
-            next_buttons = await scraper.page.query_selector_all('button:has-text("次へ"), button:has-text("次"), input[type="submit"]')
-            if next_buttons:
-                for btn in next_buttons:
-                    if await btn.is_visible():
-                        await btn.click()
-                        await asyncio.sleep(2)
-                        break
+            menu_submitted = await booker._submit_menu_detail_form(scraper.page)
+            if menu_submitted:
+                logger.info("メニュー詳細フォーム送信成功")
+                await asyncio.sleep(2)  # ページ遷移待機
             
-            step4 = await inspect_page_structure(scraper.page, "form_input")
-            form_structure['steps'].append(step4)
+            # Step 5: フォーム入力画面の状態
+            logger.info("=" * 60)
+            logger.info("Step 5: フォーム入力画面の状態の調査")
+            logger.info("=" * 60)
+            
+            step5 = await inspect_page_structure(scraper.page, "form_input")
+            form_structure['steps'].append(step5)
             
             # 結果をJSONファイルに保存
             output_file = Path("docs/form_structure_analysis.json")
