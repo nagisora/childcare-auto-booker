@@ -6,7 +6,6 @@
 
 import asyncio
 import logging
-import os
 import schedule
 import time
 from datetime import datetime, timedelta
@@ -15,6 +14,10 @@ from threading import Thread
 from src.scraper import AirReserveScraper
 from src.booker import AirReserveBooker
 from src.notifier import NotificationManager
+from src.config import (
+    get_next_release_datetime,
+    get_monitor_duration_minutes,
+)
 
 
 class Scheduler:
@@ -25,8 +28,7 @@ class Scheduler:
         self.notifier = NotificationManager()
         
         # 予約公開日時の設定
-        release_datetime_str = os.getenv("NEXT_RELEASE_DATETIME", "2024-11-01 09:30:00")
-        self.release_datetime = datetime.strptime(release_datetime_str, "%Y-%m-%d %H:%M:%S")
+        self.release_datetime = get_next_release_datetime()
         
         self.monitoring_active = False
         
@@ -103,7 +105,7 @@ class Scheduler:
                 
             # 監視期間の計算
             monitor_start = self.release_datetime - timedelta(seconds=3)
-            monitor_end = self.release_datetime + timedelta(minutes=int(os.getenv("MONITOR_DURATION_MINUTES", "10")))
+            monitor_end = self.release_datetime + timedelta(minutes=get_monitor_duration_minutes())
             
             self.logger.info(f"監視期間: {monitor_start} ～ {monitor_end}")
             

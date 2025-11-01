@@ -6,14 +6,20 @@ Airリザーブ予約ページのスクレイピング機能
 
 import asyncio
 import logging
-import os
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Dict, Optional
 from playwright.async_api import async_playwright, Browser, Page
 
-from src.config import get_target_url
+from src.config import (
+    get_target_url,
+    get_headless,
+    get_debug,
+    get_test_site_mode,
+    get_next_release_datetime,
+    get_monitor_duration_minutes,
+)
 
 
 class AirReserveScraper:
@@ -22,18 +28,17 @@ class AirReserveScraper:
     def __init__(self, booker=None):
         self.logger = logging.getLogger(__name__)
         self.target_url = get_target_url()
-        self.headless = os.getenv("HEADLESS", "true").lower() == "true"
-        self.debug = os.getenv("DEBUG", "false").lower() == "true"
+        self.headless = get_headless()
+        self.debug = get_debug()
         
         # テストサイトモード（14日前の13時から受付開始）
-        self.test_site_mode = os.getenv("TEST_SITE_MODE", "false").lower() == "true"
+        self.test_site_mode = get_test_site_mode()
         
         # 予約公開日時の設定
-        release_datetime_str = os.getenv("NEXT_RELEASE_DATETIME", "2024-11-01 09:30:00")
-        self.release_datetime = datetime.strptime(release_datetime_str, "%Y-%m-%d %H:%M:%S")
+        self.release_datetime = get_next_release_datetime()
         
         # 監視時間（分）
-        self.monitor_duration = int(os.getenv("MONITOR_DURATION_MINUTES", "10"))
+        self.monitor_duration = get_monitor_duration_minutes()
         
         # bookerへの参照（エラーチェック用）
         self.booker = booker
