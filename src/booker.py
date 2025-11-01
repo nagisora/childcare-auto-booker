@@ -16,6 +16,7 @@ from src.config import (
     get_dry_run,
     get_stop_before_submit,
     get_require_manual_confirmation,
+    get_debug,
     get_booker_name,
     get_booker_name_kana,
     get_booker_name_kana_mei,
@@ -37,6 +38,7 @@ class AirReserveBooker:
         self.dry_run = get_dry_run()
         self.stop_before_submit = get_stop_before_submit()
         self.require_manual_confirmation = get_require_manual_confirmation()
+        self.debug = get_debug()
         
         # 予約者情報
         self.booker_name = get_booker_name()
@@ -524,22 +526,38 @@ class AirReserveBooker:
                     name_filled = True
                 
                 # フリガナ（セイ）フィールド（lastNmKn）
-                if self.booker_name_kana:
-                    last_nm_kn_field = await page.query_selector('input[name="lastNmKn"]')
-                    if last_nm_kn_field and await last_nm_kn_field.is_visible() and await last_nm_kn_field.is_enabled():
+                last_nm_kn_field = await page.query_selector('input[name="lastNmKn"]')
+                if last_nm_kn_field and await last_nm_kn_field.is_visible() and await last_nm_kn_field.is_enabled():
+                    if self.booker_name_kana:
                         await last_nm_kn_field.fill(self.booker_name_kana)
                         self.logger.info(f"フリガナ（セイ）を入力: {self.booker_name_kana}")
-                else:
-                    self.logger.warning("フリガナ（セイ）が設定されていません")
+                    else:
+                        self.logger.warning("フリガナ（セイ）が設定されていません。フィールドは未入力のままです（設定値がない場合は入力しません）")
+                        # 設定値がない場合はフィールドに触れない
+                        # 必須フィールドの場合は、フォーム検証でエラーとなるが、
+                        # それは適切な動作（設定が不足しているため）
+                        if self.debug:
+                            # デバッグモードでは必須属性を確認
+                            is_required = await last_nm_kn_field.get_attribute('required')
+                            if is_required:
+                                self.logger.warning("⚠️ フリガナ（セイ）フィールドは必須ですが、設定値がありません")
                 
                 # フリガナ（メイ）フィールド（firstNmKn）
-                if self.booker_name_kana_mei:
-                    first_nm_kn_field = await page.query_selector('input[name="firstNmKn"]')
-                    if first_nm_kn_field and await first_nm_kn_field.is_visible() and await first_nm_kn_field.is_enabled():
+                first_nm_kn_field = await page.query_selector('input[name="firstNmKn"]')
+                if first_nm_kn_field and await first_nm_kn_field.is_visible() and await first_nm_kn_field.is_enabled():
+                    if self.booker_name_kana_mei:
                         await first_nm_kn_field.fill(self.booker_name_kana_mei)
                         self.logger.info(f"フリガナ（メイ）を入力: {self.booker_name_kana_mei}")
-                else:
-                    self.logger.warning("フリガナ（メイ）が設定されていません")
+                    else:
+                        self.logger.warning("フリガナ（メイ）が設定されていません。フィールドは未入力のままです（設定値がない場合は入力しません）")
+                        # 設定値がない場合はフィールドに触れない
+                        # 必須フィールドの場合は、フォーム検証でエラーとなるが、
+                        # それは適切な動作（設定が不足しているため）
+                        if self.debug:
+                            # デバッグモードでは必須属性を確認
+                            is_required = await first_nm_kn_field.get_attribute('required')
+                            if is_required:
+                                self.logger.warning("⚠️ フリガナ（メイ）フィールドは必須ですが、設定値がありません")
                 
                 if not name_filled:
                     self.logger.warning("名前入力フィールドが見つかりませんでした（全セレクター試行済み）")
@@ -586,10 +604,27 @@ class AirReserveBooker:
             
             # メールアドレス確認用フィールド（mailAddress1ForCnfrm）
             if self.booker_email:
-                mail_address1_confirm_field = await page.query_selector('input[name="mailAddress1ForCnfrm"]')
-                if mail_address1_confirm_field and await mail_address1_confirm_field.is_visible() and await mail_address1_confirm_field.is_enabled():
-                    await mail_address1_confirm_field.fill(self.booker_email)
-                    self.logger.info(f"メールアドレス（確認用）を入力: {self.booker_email}")
+                # 複数のセレクターで確認用メールアドレスフィールドを検索
+                confirm_email_selectors = [
+                    'input[name="mailAddress1ForCnfrm"]',
+                    'input[name*="emailConfirm"]',
+                    'input[name*="mailConfirm"]',
+                    'input[name*="確認"]',
+                    'input[type="email"][name*="confirm"]',
+                    '#emailConfirm, #mailConfirm'
+                ]
+                
+                confirm_email_filled = False
+                for selector in confirm_email_selectors:
+                    confirm_email_field = await page.query_selector(selector)
+                    if confirm_email_field and await confirm_email_field.is_visible() and await confirm_email_field.is_enabled():
+                        await confirm_email_field.fill(self.booker_email)
+                        self.logger.info(f"メールアドレス（確認用）を入力: {self.booker_email} (selector: {selector})")
+                        confirm_email_filled = True
+                        break
+                
+                if not confirm_email_filled:
+                    self.logger.debug("メールアドレス（確認用）フィールドが見つかりませんでした（オプションフィールドの可能性があります）")
             
             if not email_filled:
                 self.logger.warning("メールアドレス入力フィールドが見つかりませんでした")
