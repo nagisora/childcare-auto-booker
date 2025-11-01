@@ -17,7 +17,7 @@ run = "playwright install chromium"
 
 [tasks.setup-playwright-deps]
 description = "Install system dependencies for Playwright (requires sudo)"
-run = "playwright install-deps chromium"
+run = "bash scripts/install-playwright-deps.sh"
 
 [tasks.test-dry-run]
 description = "Test run in DRY_RUN mode"
@@ -26,7 +26,3 @@ run = "DRY_RUN=true python main.py --mode monitor"
 [tasks.test-monitor]
 description = "Run monitor mode"
 run = "python main.py --mode monitor"
-
-[tasks.inspect-form]
-description = "Inspect Air Reserve form structure"
-run = "python scripts/inspect_form_structure.py"
